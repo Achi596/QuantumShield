@@ -5,26 +5,31 @@
 #include "wots.h"
 #include "hash.h"
 
-#define XMSS_TREE_HEIGHT 2   // Adjust as needed (must be small for now while testing)
+#define XMSS_TREE_HEIGHT 2
+#define XMSS_MAX_KEYS (1 << XMSS_TREE_HEIGHT)
+#define XMSS_STATE_FILE "xmss_state.dat"
+#define XMSS_KEY_FILE   "xmss_key.bin"
 
 typedef struct {
-    WOTSKey wots_keys[1 << XMSS_TREE_HEIGHT];  // One WOTS key per leaf
-    uint8_t root[HASH_SIZE];                   // Merkle root (public key)
+    WOTSKey wots_keys[XMSS_MAX_KEYS];
+    uint8_t root[HASH_SIZE];
 } XMSSKey;
 
 typedef struct {
-    int index;                                 // Leaf index used
-    WOTSSignature wots_sig;                    // WOTS+ signature
-    uint8_t auth_path[XMSS_TREE_HEIGHT][HASH_SIZE]; // Merkle authentication path
+    int index;
+    WOTSSignature wots_sig;
+    uint8_t auth_path[XMSS_TREE_HEIGHT][HASH_SIZE];
 } XMSSSignature;
 
-/* Key generation (fills all WOTS keys, computes root) */
 void xmss_keygen(XMSSKey *key);
-
-/* Sign (builds WOTS signature + authentication path) */
-void xmss_sign(const uint8_t *msg, XMSSKey *key, XMSSSignature *sig, int index);
-
-/* Verify (rebuilds root from leaf + auth path) */
+void xmss_sign_auto(const uint8_t *msg, XMSSKey *key, XMSSSignature *sig);
+void xmss_sign_index(const uint8_t *msg, XMSSKey *key, XMSSSignature *sig, int idx);
 int  xmss_verify(const uint8_t *msg, XMSSSignature *sig, const uint8_t *root);
+
+int xmss_load_state(int *index);
+int xmss_save_state(int index);
+
+int xmss_save_key(const XMSSKey *key);
+int xmss_load_key(XMSSKey *key);
 
 #endif

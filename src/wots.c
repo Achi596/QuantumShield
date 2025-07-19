@@ -2,6 +2,7 @@
 #include <string.h>
 #include "wots.h"
 #include "hash.h"
+#include "csprng.h"
 
 static void wots_chain(uint8_t out[WOTS_N], const uint8_t in[WOTS_N], int start, int steps) {
     uint8_t tmp[WOTS_N];
@@ -28,9 +29,7 @@ static void base_w(const uint8_t *input, int input_len, int w, int out_len, uint
 
 void wots_gen_keypair(WOTSKey *key) {
     for (int i = 0; i < WOTS_LEN; i++) {
-        for (int j = 0; j < WOTS_N; j++) {
-            key->sk[i][j] = rand() & 0xFF;
-        }
+        csprng_random_bytes(key->sk[i], WOTS_N);
         wots_chain(key->pk[i], key->sk[i], 0, WOTS_W - 1);
     }
 }

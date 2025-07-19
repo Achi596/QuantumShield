@@ -7,6 +7,7 @@
 #include "wots.h"
 #include "hash.h"
 #include "benchmark.h"
+#include "csprng.h"
 
 #define SIG_FILE  "sig.bin"
 #define ROOT_FILE "root.hex"
@@ -66,17 +67,30 @@ static int load_sig(XMSSSignature *sig) {
 static int mode_sign(const char *message) {
     XMSSKey key;
     XMSSSignature sig;
-    printf("Generating XMSS key & signing message...\n");
-    xmss_keygen(&key);
-    int index = 0;
-    xmss_sign((const uint8_t*)message, &key, &sig, index);
-    if (!save_root(key.root) || !save_sig(&sig)) {
-        fprintf(stderr, "Error: failed to save root or signature\n");
-        return 1;
+
+    int key_status = xmss_load_key(&key);
+    if (key_status <= 0) {
+        printf("No existing key found. Generating new XMSS key...\n");
+        xmss_keygen(&key);
+        if (xmss_save_key(&key) != 0) {
+            fprintf(stderr, "Error saving XMSS key.\n");
+            return 1;
+        }
+        xmss_save_state(0); // Reset index
+    } else {
+        printf("Key file found! loading existing XMSS key...\n");
     }
-    printf("Message: \"%s\"\nRoot: ", message);
+
+    xmss_sign_auto((const uint8_t*)message, &key, &sig);
+
+    save_root(key.root);
+    save_sig(&sig);
+
+    printf("Message: \"%s\"\n", message);
+    printf("Root (public key): ");
     for (int i = 0; i < HASH_SIZE; i++) printf("%02X", key.root[i]);
-    printf("\nIndex used: %d\nDone.\n", index);
+    printf("\nIndex used: %d\nDone.\n", sig.index);
+
     return 0;
 }
 
@@ -102,17 +116,38 @@ static void print_usage(const char *prog) {
 
 /* ========== main ========== */
 int main(int argc, char *argv[]) {
-    if (argc < 2) { print_usage(argv[0]); return 1; }
+    int arg_index = 1;
+    uint64_t custom_seed = 0;
+    int seed_set = 0;
 
-    if (strcmp(argv[1], "-e") == 0 && argc >= 3) {
-        return mode_sign(argv[2]);
-    } else if (strcmp(argv[1], "-v") == 0 && argc >= 3) {
-        return mode_verify(argv[2]);
-    } else if (strcmp(argv[1], "-b") == 0) {
+    // Check for --seed option
+    if (argc > 2 && strcmp(argv[1], "--seed") == 0) {
+        custom_seed = strtoull(argv[2], NULL, 10);
+        seed_set = 1;
+        arg_index = 3;  // Skip these two arguments
+    }
+
+    if (seed_set) {
+        printf("[CSPRNG] Using deterministic seed: %llu\n", (unsigned long long)custom_seed);
+        csprng_seed_from_int(custom_seed);
+    } else {
+        csprng_init(NULL, NULL); // default random seed
+    }
+
+    if (arg_index >= argc) {
+        print_usage(argv[0]);
+        return 1;
+    }
+
+    if (strcmp(argv[arg_index], "-e") == 0 && arg_index + 1 < argc) {
+        return mode_sign(argv[arg_index + 1]);
+    } else if (strcmp(argv[arg_index], "-v") == 0 && arg_index + 1 < argc) {
+        return mode_verify(argv[arg_index + 1]);
+    } else if (strcmp(argv[arg_index], "-b") == 0) {
         int k = 100, s = 1000, v = 1000;
-        if (argc >= 3) k = atoi(argv[2]);
-        if (argc >= 4) s = atoi(argv[3]);
-        if (argc >= 5) v = atoi(argv[4]);
+        if (arg_index + 1 < argc) k = atoi(argv[arg_index + 1]);
+        if (arg_index + 2 < argc) s = atoi(argv[arg_index + 2]);
+        if (arg_index + 3 < argc) v = atoi(argv[arg_index + 3]);
         if (k <= 0) k = 1;
         if (s <= 0) s = 1;
         if (v <= 0) v = 1;

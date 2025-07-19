@@ -9,7 +9,7 @@
 #include "wots.h"
 #include "hash.h"
 
-/* Human readable size helper (internal) */
+/* Human readable size helper */
 static void human_size(double bytes, char *out, size_t outlen) {
     const char *units[] = {"B","KiB","MiB","GiB"};
     int u = 0;
@@ -30,7 +30,7 @@ void run_benchmark(int keygen_runs, int sign_runs, int verify_runs) {
     size_t sig_size  = sizeof(XMSSSignature);
     size_t root_size = HASH_SIZE;
 
-    /* KEYGEN */
+    /* KEYGEN benchmark */
     for (int i = 0; i < keygen_runs; i++) {
         start = hires_time_seconds();
         xmss_keygen(&key);
@@ -39,17 +39,20 @@ void run_benchmark(int keygen_runs, int sign_runs, int verify_runs) {
     }
     double keygen_avg = keygen_total / keygen_runs;
 
-    /* SIGN */
+    /* SIGN benchmark (reusing indices cyclically) */
     for (int i = 0; i < sign_runs; i++) {
+        int idx = i % XMSS_MAX_KEYS;  // wrap around
         start = hires_time_seconds();
-        xmss_sign((const uint8_t*)msg, &key, &sig, 0);
+        xmss_sign_index((const uint8_t*)msg, &key, &sig, idx);
         end = hires_time_seconds();
         sign_total += (end - start);
     }
     double sign_avg = sign_total / sign_runs;
 
-    /* VERIFY */
+    /* VERIFY benchmark */
     for (int i = 0; i < verify_runs; i++) {
+        int idx = i % XMSS_MAX_KEYS;
+        xmss_sign_index((const uint8_t*)msg, &key, &sig, idx); // produce sig for that index
         start = hires_time_seconds();
         xmss_verify((const uint8_t*)msg, &sig, key.root);
         end = hires_time_seconds();
@@ -75,7 +78,6 @@ void run_benchmark(int keygen_runs, int sign_runs, int verify_runs) {
     printf("Sig size    : %zu (%s)\n", sig_size, sig_hr);
     printf("Root size   : %zu (%s)\n", root_size, root_hr);
     printf("Msg used    : \"%s\"\n", msg);
-    printf("NOTE: Prototype (no real Merkle path / WOTS+ yet)\n");
     printf("================================\n");
 
     /* CSV logging */
