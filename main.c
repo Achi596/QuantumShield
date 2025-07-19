@@ -108,10 +108,9 @@ static int mode_verify(const char *message) {
 
 static void print_usage(const char *prog) {
     printf("Usage:\n");
-    printf("  %s -e \"message\"          # sign\n", prog);
-    printf("  %s -v \"message\"          # verify\n", prog);
-    printf("  %s -b [k s v]             # benchmark (defaults 100 1000 1000)\n", prog);
-    benchmark_print_csv_hint();
+    printf("  %s [--seed N] -e \"message\"   # sign message\n", prog);
+    printf("  %s [--seed N] -v \"message\"   # verify message\n", prog);
+    printf("  %s [--seed N] -b [k s v]      # benchmark (defaults 100 1000 1000)\n", prog);
 }
 
 /* ========== main ========== */
@@ -124,7 +123,7 @@ int main(int argc, char *argv[]) {
     if (argc > 2 && strcmp(argv[1], "--seed") == 0) {
         custom_seed = strtoull(argv[2], NULL, 10);
         seed_set = 1;
-        arg_index = 3;  // Skip these two arguments
+        arg_index = 3;  // Skip --seed and its value
     }
 
     if (seed_set) {
