@@ -12,7 +12,7 @@ static void wots_pk_to_leaf(const WOTSKey *wots, uint8_t leaf[HASH_SIZE]) {
     for (int j = 0; j < WOTS_LEN; j++) {
         memcpy(concat + j * WOTS_N, wots->pk[j], WOTS_N);
     }
-    hash_sha256(concat, sizeof(concat), leaf);
+    hash_shake256(concat, sizeof(concat), leaf, HASH_SIZE);
 }
 
 int xmss_load_state(int *index) {
@@ -60,7 +60,7 @@ static void build_leaves(const XMSSKey *key, uint8_t leaves[XMSS_MAX_KEYS][HASH_
         for (int j = 0; j < WOTS_LEN; j++) {
             memcpy(concat + j * WOTS_N, key->wots_keys[i].pk[j], WOTS_N);
         }
-        hash_sha256(concat, sizeof(concat), leaves[i]);
+        hash_shake256(concat, sizeof(concat), leaves[i], HASH_SIZE);
     }
 }
 
@@ -133,7 +133,7 @@ int xmss_verify(const uint8_t *msg, XMSSSignature *sig, const uint8_t *root) {
         for (int j = 0; j < WOTS_LEN; j++) {
             memcpy(concat + j * WOTS_N, pk_recovered[j], WOTS_N);
         }
-        hash_sha256(concat, sizeof(concat), leaf);
+        hash_shake256(concat, sizeof(concat), leaf, HASH_SIZE);
     }
 
     // Reconstruct root from leaf + auth path

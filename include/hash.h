@@ -1,11 +1,12 @@
 #ifndef HASH_H
 #define HASH_H
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
-#define HASH_SIZE 32
+#define HASH_SIZE 32  // Output size for SHAKE256 (256-bit security)
 
-void hash_sha256(const uint8_t *input, size_t len, uint8_t *out);
+// SHAKE256 hashing
+void hash_shake256(const uint8_t *in, size_t inlen, uint8_t *out, size_t outlen);
 
 #endif

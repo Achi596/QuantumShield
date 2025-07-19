@@ -8,7 +8,7 @@ static void wots_chain(uint8_t out[WOTS_N], const uint8_t in[WOTS_N], int start,
     uint8_t tmp[WOTS_N];
     memcpy(tmp, in, WOTS_N);
     for (int i = start; i < start + steps && i < WOTS_W; i++) {
-        hash_sha256(tmp, WOTS_N, tmp);
+        hash_shake256(tmp, WOTS_N, tmp, HASH_SIZE);
     }
     memcpy(out, tmp, WOTS_N);
 }
@@ -36,7 +36,7 @@ void wots_gen_keypair(WOTSKey *key) {
 
 void wots_sign(const uint8_t *msg, size_t msg_len, WOTSKey *key, WOTSSignature *sig) {
     uint8_t msg_hash[WOTS_N];
-    hash_sha256(msg, msg_len, msg_hash);
+    hash_shake256(msg, msg_len, msg_hash, HASH_SIZE);
 
     uint8_t a[WOTS_LEN] = {0};
     base_w(msg_hash, WOTS_N, WOTS_W, WOTS_LEN, a);
@@ -48,7 +48,7 @@ void wots_sign(const uint8_t *msg, size_t msg_len, WOTSKey *key, WOTSSignature *
 
 void wots_pk_from_sig(const uint8_t *msg, size_t msg_len, WOTSSignature *sig, uint8_t pk[WOTS_LEN][WOTS_N]) {
     uint8_t msg_hash[WOTS_N];
-    hash_sha256(msg, msg_len, msg_hash);
+    hash_shake256(msg, msg_len, msg_hash, HASH_SIZE);
 
     uint8_t a[WOTS_LEN] = {0};
     base_w(msg_hash, WOTS_N, WOTS_W, WOTS_LEN, a);

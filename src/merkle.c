@@ -21,7 +21,7 @@ void merkle_compute_root(const uint8_t leaves[][HASH_SIZE], int num_leaves, uint
             uint8_t concat[2 * HASH_SIZE];
             memcpy(concat, level[2*i], HASH_SIZE);
             memcpy(concat + HASH_SIZE, level[2*i + 1], HASH_SIZE);
-            hash_sha256(concat, sizeof(concat), level[i]);
+            hash_shake256(concat, sizeof(concat), level[i], HASH_SIZE);
         }
         level_nodes = parent_nodes;
     }
@@ -47,7 +47,7 @@ void merkle_auth_path(const uint8_t leaves[][HASH_SIZE], int num_leaves, int lea
             uint8_t concat[2 * HASH_SIZE];
             memcpy(concat, level[2*i], HASH_SIZE);
             memcpy(concat + HASH_SIZE, level[2*i + 1], HASH_SIZE);
-            hash_sha256(concat, sizeof(concat), level[i]);
+            hash_shake256(concat, sizeof(concat), level[i], HASH_SIZE);
         }
         idx /= 2;
         level_nodes = parent_nodes;
@@ -73,7 +73,7 @@ void merkle_root_from_path(const uint8_t leaf[HASH_SIZE], int leaf_index,
             memcpy(concat, auth_path[h], HASH_SIZE);
             memcpy(concat + HASH_SIZE, current, HASH_SIZE);
         }
-        hash_sha256(concat, sizeof(concat), current);
+        hash_shake256(concat, sizeof(concat), current, HASH_SIZE);
         idx /= 2;
     }
     memcpy(root_out, current, HASH_SIZE);
