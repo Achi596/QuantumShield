@@ -1,2 +1,2 @@
 timestamp,keygen_runs,sign_runs,verify_runs,keygen_avg_s,sign_avg_s,verify_avg_s,key_size_bytes,sig_size_bytes,root_size_bytes,xmss_tree_height,wots_len,hash_size
-1752891907,100,1000,1000,0.000018987,0.000000026,0.000000386,224,68,32,2,1,32
+1752893328,100,1000,1000,0.001141027,0.000118373,0.000152327,17184,2148,32,2,67,32

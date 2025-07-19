@@ -2,9 +2,14 @@
 #define MERKLE_H
 
 #include <stdint.h>
-#include <stddef.h>
 #include "hash.h"
 
-void merkle_root(const uint8_t *leaves, size_t leaf_count, uint8_t *out);
+/**
+ * Compute a Merkle root from a flat array of leaves.
+ * @param leaves    Array of leaf hashes [num_leaves][HASH_SIZE]
+ * @param num_leaves Power-of-two number of leaves
+ * @param root      Output buffer (HASH_SIZE)
+ */
+void merkle_compute_root(const uint8_t leaves[][HASH_SIZE], int num_leaves, uint8_t root[HASH_SIZE]);
 
 #endif

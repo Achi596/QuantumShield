@@ -1,29 +1,59 @@
-#include "xmss.h"
-#include "merkle.h"
-#include "wots.h"
 #include <string.h>
+#include <stdio.h>
+#include "xmss.h"
+#include "wots.h"
+#include "hash.h"
+#include "merkle.h"
 
-void xmss_keygen(XMSSKey *key) {
-    for (int i = 0; i < XMSS_TREE_HEIGHT; i++) {
-        wots_gen_keypair(&key->wots_keys[i]);
-        memcpy(key->leaves + i * HASH_SIZE, key->wots_keys[i].pk[0], HASH_SIZE);
+/* --- Build Merkle root from WOTS+ public keys --- */
+static void compute_merkle_root(XMSSKey *key) {
+    uint8_t leaves[1 << XMSS_TREE_HEIGHT][HASH_SIZE];
+
+    // Hash each WOTS public key into a leaf
+    for (int i = 0; i < (1 << XMSS_TREE_HEIGHT); i++) {
+        uint8_t concat[WOTS_LEN * WOTS_N];
+        for (int j = 0; j < WOTS_LEN; j++) {
+            memcpy(concat + j * WOTS_N, key->wots_keys[i].pk[j], WOTS_N);
+        }
+        hash_sha256(concat, sizeof(concat), leaves[i]);
     }
-    merkle_root(key->leaves, XMSS_TREE_HEIGHT, key->root);
+
+    // Compute Merkle root
+    merkle_compute_root(leaves, 1 << XMSS_TREE_HEIGHT, key->root);
 }
 
-void xmss_sign(const uint8_t *msg, XMSSKey *key, XMSSSignature *sig, int idx) {
-    memcpy(sig->root, key->root, HASH_SIZE);
-    wots_sign(msg, &key->wots_keys[idx], &sig->wots_sig);
-    sig->index = idx;
+/* --- Generate XMSS keypair --- */
+void xmss_keygen(XMSSKey *key) {
+    for (int i = 0; i < (1 << XMSS_TREE_HEIGHT); i++) {
+        wots_gen_keypair(&key->wots_keys[i]);
+    }
+    compute_merkle_root(key);
 }
 
+/* --- Sign a message using WOTS+ leaf --- */
+void xmss_sign(const uint8_t *msg, XMSSKey *key, XMSSSignature *sig, int index) {
+    sig->index = index;
+    size_t msg_len = strlen((const char*)msg);  // For now, assume null-terminated string
+    wots_sign(msg, msg_len, &key->wots_keys[index], &sig->wots_sig);
+}
+
+/* --- Verify a signature --- */
 int xmss_verify(const uint8_t *msg, XMSSSignature *sig, const uint8_t *root) {
-    uint8_t derived_pk[WOTS_LEN][WOTS_N];
-    uint8_t leaf[HASH_SIZE];
+    size_t msg_len = strlen((const char*)msg);
+    uint8_t pk_recovered[WOTS_LEN][WOTS_N];
 
-    wots_pk_from_sig(msg, &sig->wots_sig, derived_pk);
-    memcpy(leaf, derived_pk[0], HASH_SIZE);
+    // Recover WOTS public key from signature
+    wots_pk_from_sig(msg, msg_len, &sig->wots_sig, pk_recovered);
 
-    // For demo purposes, skip Merkle path and compare roots
-    return memcmp(root, sig->root, HASH_SIZE) == 0;
+    // Hash the recovered WOTS public key into a leaf
+    uint8_t leaf_hash[HASH_SIZE];
+    uint8_t concat[WOTS_LEN * WOTS_N];
+    for (int j = 0; j < WOTS_LEN; j++) {
+        memcpy(concat + j * WOTS_N, pk_recovered[j], WOTS_N);
+    }
+    hash_sha256(concat, sizeof(concat), leaf_hash);
+
+    // *** NOTE ***
+    // This directly compares leaf_hash with root (not real XMSS!)
+    return (memcmp(leaf_hash, root, HASH_SIZE) == 0);
 }
