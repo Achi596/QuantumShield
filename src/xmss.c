@@ -6,6 +6,7 @@
 #include "hash.h"
 #include "merkle.h"
 #include "csprng.h"
+#include "xmss_io.h"
 
 /* Encode little-endian */
 static void u32le(uint8_t out[4], uint32_t x) {
@@ -181,23 +182,10 @@ int xmss_verify(const uint8_t *msg, XMSSSignature *sig, const uint8_t *root) {
     return memcmp(computed_root, root, HASH_SIZE) == 0;
 }
 
-/* Key persistence */
+/* Legacy wrapper to preserve existing calls */
 int xmss_save_key(const XMSSKey *key) {
-    FILE *f = fopen(XMSS_KEY_FILE, "wb");
-    if (!f) { perror("xmss_save_key fopen"); return -1; }
-    if (fwrite(key, sizeof(XMSSKey), 1, f) != 1) {
-        perror("xmss_save_key fwrite"); fclose(f); return -1;
-    }
-    fclose(f);
-    return 0;
+    return xmss_io_save_key(XMSS_KEY_FILE, key, XMSS_IO_HASH_SHAKE256);
 }
-
 int xmss_load_key(XMSSKey *key) {
-    FILE *f = fopen(XMSS_KEY_FILE, "rb");
-    if (!f) return 0; /* no key */
-    if (fread(key, sizeof(XMSSKey), 1, f) != 1) {
-        perror("xmss_load_key fread"); fclose(f); return -1;
-    }
-    fclose(f);
-    return 1;
+    return xmss_io_load_key(XMSS_KEY_FILE, key, NULL);
 }
