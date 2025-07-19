@@ -1,8 +1,6 @@
-# Makefile for XMSS minimal hash-signature in C
-
 CC = gcc
-CFLAGS = -Iinclude -I/mingw64/include -Wall
-LDFLAGS = -L/mingw64/lib -lssl -lcrypto
+CFLAGS = -Iinclude -Wall
+LDFLAGS = -lssl -lcrypto
 
 SRC = $(wildcard src/*.c)
 OBJ = $(SRC:.c=.o)
@@ -10,8 +8,11 @@ TARGET = hashsig
 
 all: $(TARGET)
 
-$(TARGET): $(SRC) main.c
+$(TARGET): $(OBJ) main.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
+main.o: main.c
+	$(CC) $(CFLAGS) -c main.c -o main.o
+
 clean:
-	rm -f $(TARGET) $(OBJ)
+	rm -f $(TARGET) $(OBJ) main.o bench.csv
