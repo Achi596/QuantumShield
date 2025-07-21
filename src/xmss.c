@@ -1,48 +1,36 @@
+#include "xmss.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "xmss.h"
 #include "wots.h"
 #include "hash.h"
 #include "merkle.h"
 #include "csprng.h"
-#include "xmss_io.h"
+#include "xmss_eth.h"
 
-/* Encode little-endian */
-static void u32le(uint8_t out[4], uint32_t x) {
-    out[0] = (uint8_t)(x);
-    out[1] = (uint8_t)(x >> 8);
-    out[2] = (uint8_t)(x >> 16);
-    out[3] = (uint8_t)(x >> 24);
-}
-static void u16le(uint8_t out[2], uint16_t x) {
-    out[0] = (uint8_t)(x);
-    out[1] = (uint8_t)(x >> 8);
-}
-
-/* Deterministically derive a WOTS secret chain element */
-static void derive_wots_secret(uint8_t out[WOTS_N],
-                               const uint8_t seed[XMSS_SEED_BYTES],
-                               uint32_t leaf_idx,
-                               uint16_t chain_idx) {
-    uint8_t buf[1 + XMSS_SEED_BYTES + 4 + 2];
-    size_t pos = 0;
-    buf[pos++] = 0x53; /* 'S' domain tag for Secret */
-    memcpy(buf + pos, seed, XMSS_SEED_BYTES); pos += XMSS_SEED_BYTES;
-    u32le(buf + pos, leaf_idx); pos += 4;
-    u16le(buf + pos, chain_idx); pos += 2;
-    hash_shake256(buf, pos, out, WOTS_N);
-}
-
-/* Build leaf from WOTS pk */
-static void wots_pk_to_leaf(const WOTSKey *wots, uint8_t leaf[HASH_SIZE]) {
-    uint8_t concat[WOTS_LEN * WOTS_N];
-    for (int j = 0; j < WOTS_LEN; j++) {
-        memcpy(concat + j * WOTS_N, wots->pk[j], WOTS_N);
+/* Remove unused static functions */
+void compute_node(uint8_t *node, XMSSKey *key, int height, uint64_t index) {
+    if (height == 0) {
+        // Leaf node - generate WOTS key and compute public key
+        WOTSKey wots_key;
+        xmss_generate_wots_key(key, index, &wots_key);
+        wots_compute_pk(&wots_key);
+        hash_shake256((uint8_t*)wots_key.pk, WOTS_N * WOTS_LEN, node, HASH_SIZE);
+        return;
     }
-    hash_shake256(concat, sizeof(concat), leaf, HASH_SIZE);
+
+    // Internal node - compute children and hash
+    uint8_t left[HASH_SIZE], right[HASH_SIZE];
+    compute_node(left, key, height - 1, index * 2);
+    compute_node(right, key, height - 1, index * 2 + 1);
+    
+    uint8_t buffer[2 * HASH_SIZE];
+    memcpy(buffer, left, HASH_SIZE);
+    memcpy(buffer + HASH_SIZE, right, HASH_SIZE);
+    hash_shake256(buffer, 2 * HASH_SIZE, node, HASH_SIZE);
 }
 
+/* Load XMSS key from file */
 int xmss_load_state(int *index) {
     FILE *f = fopen(XMSS_STATE_FILE, "rb");
     if (!f) {
@@ -54,6 +42,7 @@ int xmss_load_state(int *index) {
     return 1;
 }
 
+/* Save XMSS key state to file */
 int xmss_save_state(int index) {
     FILE *f = fopen(XMSS_STATE_FILE, "wb");
     if (!f) return -1;
@@ -64,75 +53,40 @@ int xmss_save_state(int index) {
 
 /* Keygen: derive all WOTS sk from master seed */
 void xmss_keygen(XMSSKey *key) {
+    // Generate random seed
     csprng_random_bytes(key->seed, XMSS_SEED_BYTES);
-
-    int total_leaves = XMSS_MAX_KEYS;
-    for (int i = 0; i < total_leaves; i++) {
-        for (int j = 0; j < WOTS_LEN; j++) {
-            derive_wots_secret(key->wots_keys[i].sk[j], key->seed, (uint32_t)i, (uint16_t)j);
-        }
-        wots_compute_pk(&key->wots_keys[i]);
-    }
-
-    /* Build leaves */
-    uint8_t leaves[XMSS_MAX_KEYS][HASH_SIZE];
-    for (int i = 0; i < total_leaves; i++) {
-        wots_pk_to_leaf(&key->wots_keys[i], leaves[i]);
-    }
-    merkle_compute_root(leaves, total_leaves, key->root);
+    
+    // Compute root node
+    compute_node(key->root, key, XMSS_TREE_HEIGHT, 0);
 }
 
-// Keygen with a specific seed (for testing or deterministic generation)
-void xmss_keygen_seeded(XMSSKey *key, const uint8_t seed[XMSS_SEED_BYTES]) {
-    memcpy(key->seed, seed, XMSS_SEED_BYTES);
-
-    int total_leaves = XMSS_MAX_KEYS;
-    for (int i = 0; i < total_leaves; i++) {
-        for (int j = 0; j < WOTS_LEN; j++) {
-            derive_wots_secret(key->wots_keys[i].sk[j], key->seed, (uint32_t)i, (uint16_t)j);
-        }
-        wots_compute_pk(&key->wots_keys[i]);
-    }
-
-    uint8_t leaves[XMSS_MAX_KEYS][HASH_SIZE];
-    for (int i = 0; i < total_leaves; i++) {
-        uint8_t concat[WOTS_LEN * WOTS_N];
-        for (int j = 0; j < WOTS_LEN; j++) {
-            memcpy(concat + j * WOTS_N, key->wots_keys[i].pk[j], WOTS_N);
-        }
-        hash_shake256(concat, sizeof(concat), leaves[i], HASH_SIZE);
-    }
-
-    merkle_compute_root(leaves, total_leaves, key->root);
-}
-
-
-/* Internal helper: rebuild all leaves from stored WOTS pk */
-static void build_leaves(const XMSSKey *key, uint8_t leaves[XMSS_MAX_KEYS][HASH_SIZE]) {
-    for (int i = 0; i < XMSS_MAX_KEYS; i++) {
-        wots_pk_to_leaf(&key->wots_keys[i], leaves[i]);
-    }
-}
-
-/* Manual sign (no state update) */
-void xmss_sign_index(const uint8_t *msg, XMSSKey *key, XMSSSignature *sig, int index) {
-    if (index < 0 || index >= XMSS_MAX_KEYS) {
-        fprintf(stderr, "xmss_sign_index: invalid index %d\n", index);
-        exit(1);
-    }
-    sig->index = index;
-    size_t msg_len = strlen((const char*)msg);
-    wots_sign(msg, msg_len, &key->wots_keys[index], &sig->wots_sig);
-
-    uint8_t leaves[XMSS_MAX_KEYS][HASH_SIZE];
-    build_leaves(key, leaves);
-
-    uint8_t recomputed_root[HASH_SIZE];
-    merkle_auth_path(leaves, XMSS_MAX_KEYS, index, sig->auth_path, recomputed_root);
-
-    if (memcmp(recomputed_root, key->root, HASH_SIZE) != 0) {
-        fprintf(stderr, "xmss_sign_index: root mismatch (internal error)\n");
-        exit(1);
+/* Keygen with seeded PRF */
+void xmss_sign_index(const uint8_t *msg, XMSSKey *key, XMSSSignature *sig, int idx) {
+    if (idx < 0 || idx >= XMSS_MAX_KEYS) return;
+    
+    sig->index = idx;
+    
+    // Hash message
+    uint8_t msg_hash[HASH_SIZE];
+    hash_shake256(msg, strlen((const char*)msg), msg_hash, HASH_SIZE);
+    
+    // Generate WOTS key for this index
+    WOTSKey wots_key;
+    xmss_generate_wots_key(key, idx, &wots_key);
+    wots_compute_pk(&wots_key);
+    
+    // Sign message with WOTS
+    wots_sign(msg_hash, HASH_SIZE, &wots_key, &sig->wots_sig);
+    
+    uint8_t leaf[HASH_SIZE];
+    hash_shake256((uint8_t*)wots_key.pk, WOTS_LEN * WOTS_N, leaf, HASH_SIZE);
+    
+    // Compute authentication path
+    uint64_t node_idx = idx;
+    for (int h = 0; h < XMSS_TREE_HEIGHT; h++) {
+        uint64_t sibling_idx = node_idx ^ 1;
+        compute_node(sig->auth_path[h], key, h, sibling_idx);
+        node_idx >>= 1;
     }
 }
 
@@ -162,31 +116,54 @@ void xmss_sign_auto(const uint8_t *msg, XMSSKey *key, XMSSSignature *sig) {
 
 /* Verify */
 int xmss_verify(const uint8_t *msg, XMSSSignature *sig, const uint8_t *root) {
-    size_t msg_len = strlen((const char*)msg);
-    int index = sig->index;
-    if (index < 0 || index >= XMSS_MAX_KEYS) return 0;
+    uint8_t msg_hash[HASH_SIZE];
+    hash_shake256(msg, strlen((const char*)msg), msg_hash, HASH_SIZE);
 
-    uint8_t pk_recovered[WOTS_LEN][WOTS_N];
-    wots_pk_from_sig(msg, msg_len, &sig->wots_sig, pk_recovered);
-
-    uint8_t leaf[HASH_SIZE];
-    {
-        uint8_t concat[WOTS_LEN * WOTS_N];
-        for (int j = 0; j < WOTS_LEN; j++) {
-            memcpy(concat + j * WOTS_N, pk_recovered[j], WOTS_N);
+    // Generate WOTS public key from signature
+    WOTSKey wots_pk;
+    wots_verify(msg_hash, &sig->wots_sig, &wots_pk);
+    
+    // Compute root from signature path
+    uint8_t node[HASH_SIZE];
+    uint8_t buffer[2 * HASH_SIZE];
+    
+    // Hash WOTS public key to get leaf node
+    hash_shake256((uint8_t*)wots_pk.pk, WOTS_N * WOTS_LEN, node, HASH_SIZE);
+    
+    // Compute root using authentication path
+    uint64_t idx = sig->index;
+    for (int h = 0; h < XMSS_TREE_HEIGHT; h++) {
+        if (idx & 1) {
+            memcpy(buffer, sig->auth_path[h], HASH_SIZE);
+            memcpy(buffer + HASH_SIZE, node, HASH_SIZE);
+        } else {
+            memcpy(buffer, node, HASH_SIZE);
+            memcpy(buffer + HASH_SIZE, sig->auth_path[h], HASH_SIZE);
         }
-        hash_shake256(concat, sizeof(concat), leaf, HASH_SIZE);
+        hash_shake256(buffer, 2 * HASH_SIZE, node, HASH_SIZE);
+        idx >>= 1;
     }
 
-    uint8_t computed_root[HASH_SIZE];
-    merkle_root_from_path(leaf, index, sig->auth_path, XMSS_TREE_HEIGHT, computed_root);
-    return memcmp(computed_root, root, HASH_SIZE) == 0;
+    return memcmp(node, root, HASH_SIZE) == 0;
 }
 
-/* Legacy wrapper to preserve existing calls */
+/* Save raw XMSSKey structure to disk */
 int xmss_save_key(const XMSSKey *key) {
-    return xmss_io_save_key(XMSS_KEY_FILE, key, XMSS_IO_HASH_SHAKE256);
+    FILE *f = fopen(XMSS_KEY_FILE, "wb");
+    if (!f) return -1;
+    if (fwrite(key, sizeof(XMSSKey), 1, f) != 1) {
+        fclose(f);
+        return -1;
+    }
+    fclose(f);
+    return 0;
 }
+
+/* Load raw XMSSKey structure from disk */
 int xmss_load_key(XMSSKey *key) {
-    return xmss_io_load_key(XMSS_KEY_FILE, key, NULL);
+    FILE *f = fopen(XMSS_KEY_FILE, "rb");
+    if (!f) return 0;  /* Key file doesn't exist */
+    size_t read = fread(key, 1, sizeof(XMSSKey), f);
+    fclose(f);
+    return (read == sizeof(XMSSKey)) ? 1 : -1;
 }

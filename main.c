@@ -6,7 +6,7 @@
 #include "csprng.h"
 #include "benchmark.h"
 #include "xmss.h"
-#include "xmss_io.h"
+#include "xmss_eth.h"
 #include "wots.h"
 #include "hash.h"
 
@@ -33,6 +33,8 @@ static int save_root(const uint8_t *root) {
     fclose(f);
     return 1;
 }
+
+/* Load the root hash from file */
 static int load_root(uint8_t *root) {
     FILE *f = fopen(ROOT_FILE, "r");
     if (!f) return 0;
@@ -41,13 +43,24 @@ static int load_root(uint8_t *root) {
     size_t l = strlen(hex);
     if (l && (hex[l-1] == '\n' || hex[l-1] == '\r')) hex[l-1] = '\0';
     fclose(f);
+
+    // Add error checking for hex string length
+    if (strlen(hex) != HASH_SIZE * 2) {
+        fprintf(stderr, "Invalid root hash length in %s\n", ROOT_FILE);
+        return 0;
+    }
+
     for (size_t i = 0; i < HASH_SIZE; i++) {
-        sscanf(hex + 2 * i, "%2hhx", &root[i]);
+        int read = sscanf(hex + 2 * i, "%2hhx", &root[i]);
+        if (read != 1) {
+            fprintf(stderr, "Failed to parse hex at position %zu\n", i);
+            return 0;
+        }
     }
     return 1;
 }
 
-/* Mode: Sign */
+// This function signs a message using XMSS and saves the signature.
 static int mode_sign(const char *message) {
     XMSSKey key;
     XMSSSignature sig;
@@ -70,37 +83,50 @@ static int mode_sign(const char *message) {
         fprintf(stderr, "Failed to save root hex\n");
         return 1;
     }
-    if (xmss_io_save_sig(SIG_FILE, &sig, XMSS_IO_HASH_SHAKE256) != 0) {
-        fprintf(stderr, "Failed to save signature\n");
+    if (xmss_eth_save_sig(SIG_FILE, &sig) != 0) {
+        fprintf(stderr, "Failed to save Ethereum compact signature\n");
         return 1;
     }
 
+    size_t sigsz = xmss_eth_sig_size();
     printf("Message: \"%s\"\n", message);
     printf("Root (public key): ");
     for (int i = 0; i < HASH_SIZE; i++) printf("%02X", key.root[i]);
-    printf("\nIndex used: %d\nDone.\n", sig.index);
+    printf("\nIndex used: %d\n", sig.index);
+    printf("Ethereum compact signature size: %zu bytes%s\n",
+           sigsz, (sigsz > XMSS_ETH_SIG_MAX_BYTES ? " (WARNING >4k!)" : ""));
+    printf("Done.\n");
     return 0;
 }
 
-/* Mode: Verify */
+
+// This function verifies a message signature using XMSS.
 static int mode_verify(const char *message) {
     XMSSSignature sig;
     uint8_t root[HASH_SIZE];
 
-    uint8_t hash_id;
     if (!load_root(root)) {
-        fprintf(stderr, "Missing %s\n", ROOT_FILE);
+        fprintf(stderr, "Missing root.hex\n");
         return 1;
     }
-    if (!xmss_io_load_sig(SIG_FILE, &sig, &hash_id)) {
+    printf("Loaded root: ");
+    for (int i = 0; i < HASH_SIZE; i++) printf("%02X", root[i]);
+    printf("\n");
+
+    size_t sig_len = 0;
+    int r = xmss_eth_load_sig(SIG_FILE, &sig, &sig_len);
+    if (r <= 0) {
         fprintf(stderr, "Missing or invalid %s\n", SIG_FILE);
         return 1;
     }
+    printf("Loaded signature (index=%d, len=%zu)\n", sig.index, sig_len);
+    printf("Message to verify: \"%s\"\n", message);
 
     int ok = xmss_verify((const uint8_t*)message, &sig, root);
-    printf(ok ? "✅ Verification SUCCESS\n" : "❌ Verification FAILED\n");
+    printf(ok ? "Verification SUCCESS\n" : "Verification FAILED\n");
     return ok ? 0 : 1;
 }
+
 
 /* Usage instructions */
 static void print_usage(const char *prog) {
@@ -110,6 +136,7 @@ static void print_usage(const char *prog) {
     printf("  %s [--seed N] -b [k s v]      # benchmark (defaults 100 1000 1000)\n", prog);
 }
 
+/* Run benchmarks */
 int main(int argc, char *argv[]) {
     int arg_index = 1;
     uint64_t custom_seed = 0;
@@ -139,7 +166,7 @@ int main(int argc, char *argv[]) {
     } else if (strcmp(argv[arg_index], "-v") == 0 && arg_index + 1 < argc) {
         return mode_verify(argv[arg_index + 1]);
     } else if (strcmp(argv[arg_index], "-b") == 0) {
-        int k = 100, s = 1000, v = 1000;
+        int k = 10, s = 100, v = 100;
         if (arg_index + 1 < argc) k = atoi(argv[arg_index + 1]);
         if (arg_index + 2 < argc) s = atoi(argv[arg_index + 2]);
         if (arg_index + 3 < argc) v = atoi(argv[arg_index + 3]);

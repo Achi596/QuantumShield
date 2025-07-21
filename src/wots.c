@@ -67,3 +67,16 @@ void wots_pk_from_sig(const uint8_t *msg, size_t msg_len, WOTSSignature *sig,
         wots_chain(pk[i], sig->sig[i], a[i], WOTS_W - 1 - a[i]);
     }
 }
+
+// Verify a WOTS signature against a message
+void wots_verify(const uint8_t *msg, const WOTSSignature *sig, WOTSKey *pk) {
+    uint8_t msg_hash[HASH_SIZE];
+    hash_shake256(msg, HASH_SIZE, msg_hash, HASH_SIZE);
+    
+    uint8_t msg_base_w[WOTS_LEN] = {0};
+    base_w(msg_hash, HASH_SIZE, WOTS_W, WOTS_LEN, msg_base_w);
+    
+    for (int i = 0; i < WOTS_LEN; i++) {
+        wots_chain(pk->pk[i], sig->sig[i], msg_base_w[i], WOTS_W - 1 - msg_base_w[i]);
+    }
+}

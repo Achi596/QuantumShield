@@ -2,29 +2,30 @@
 #define WOTS_H
 
 #include <stdint.h>
-#include <stddef.h>
 
-#define WOTS_W 16      /* Winternitz base */
-#define WOTS_N 32      /* bytes per element (MATCH HASH_SIZE) */
-#define WOTS_LEN 67    /* derived for N=32, w=16 */
+#define WOTS_W 16 // Base for WOTS (WOTS+ uses base-16)
+#define WOTS_LOG_W 4  // log2(16)
+#define WOTS_N 32     // Hash output size in bytes
 
-// Winternitz One-Time Signature (WOTS) key structure
+// Length calculations
+#define WOTS_LEN1 (8 * WOTS_N / WOTS_LOG_W)              // # of message blocks
+#define WOTS_LEN2 ((WOTS_LOG_W + 1) / WOTS_LOG_W)        // # of checksum blocks
+#define WOTS_LEN (WOTS_LEN1 + WOTS_LEN2)                 // Total number of blocks
+
+// Key and signature structures
 typedef struct {
-    uint8_t sk[WOTS_LEN][WOTS_N];
-    uint8_t pk[WOTS_LEN][WOTS_N];
+    uint8_t sk[WOTS_LEN][WOTS_N];  // Secret key
+    uint8_t pk[WOTS_LEN][WOTS_N];  // Public key
 } WOTSKey;
 
-// Winternitz One-Time Signature (WOTS) signature structure
+// Signature structure
 typedef struct {
     uint8_t sig[WOTS_LEN][WOTS_N];
 } WOTSSignature;
 
-/* Compute pk from sk (used for deterministic derivation) */
+// Function declarations
 void wots_compute_pk(WOTSKey *key);
-
-/* Sign & rebuild pk from sig */
 void wots_sign(const uint8_t *msg, size_t msg_len, WOTSKey *key, WOTSSignature *sig);
-void wots_pk_from_sig(const uint8_t *msg, size_t msg_len, WOTSSignature *sig,
-                      uint8_t pk[WOTS_LEN][WOTS_N]);
+void wots_verify(const uint8_t *msg, const WOTSSignature *sig, WOTSKey *pk);
 
 #endif

@@ -20,6 +20,8 @@ static void human_size(double bytes, char *out, size_t outlen) {
 
 // Run the benchmark for key generation, signing, and verification.
 void run_benchmark(int keygen_runs, int sign_runs, int verify_runs) {
+    printf("Benchmarking, this will take some time...\n");
+
     XMSSKey key;
     XMSSSignature sig;
     const char *msg = "benchmark message";

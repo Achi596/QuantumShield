@@ -53,7 +53,7 @@
 ## Quick Build (Linux)
 
 ```bash
-git clone <your-repo-url> QuantumShield
+git clone https://github.com/Achi596/QuantumShield
 cd QuantumShield
 make
 ./hashsig -e "hello world"
@@ -67,8 +67,7 @@ make
     ```
 3. Clone & build:
     ```bash
-    cd /c/Users/<you>/Downloads
-    git clone <your-repo-url> QuantumShield
+    git https://github.com/Achi596/QuantumShield
     cd QuantumShield
     make
     ```
