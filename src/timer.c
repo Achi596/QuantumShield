@@ -4,6 +4,7 @@
 #define USE_QPC
 #include <windows.h>
 
+// High-resolution timer using QueryPerformanceCounter
 double hires_time_seconds(void) {
     static LARGE_INTEGER freq;
     static int init = 0;
@@ -16,9 +17,11 @@ double hires_time_seconds(void) {
     return (double)counter.QuadPart / (double)freq.QuadPart;
 }
 
+// Fallback to using the standard time function
 #else
 #include <time.h>
 
+// High-resolution timer using clock_gettime
 double hires_time_seconds(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);

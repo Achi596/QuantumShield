@@ -15,12 +15,14 @@
 /* Master seed size for PRF-based key derivation */
 #define XMSS_SEED_BYTES 32
 
+// XMSS key structure
 typedef struct {
     uint8_t  seed[XMSS_SEED_BYTES];            /* master seed */
     WOTSKey  wots_keys[XMSS_MAX_KEYS];         /* expanded (derived) WOTS keys */
     uint8_t  root[HASH_SIZE];                  /* Merkle root */
 } XMSSKey;
 
+// XMSS signature structure
 typedef struct {
     int index;
     WOTSSignature wots_sig;

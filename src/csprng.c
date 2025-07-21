@@ -7,6 +7,8 @@
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
 #include <wincrypt.h>
+
+// Windows CSPRNG using CryptGenRandom
 static void os_random_bytes(uint8_t *buf, size_t len) {
     HCRYPTPROV hProvider = 0;
     if (!CryptAcquireContext(&hProvider, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT)) {
@@ -19,6 +21,8 @@ static void os_random_bytes(uint8_t *buf, size_t len) {
     }
     CryptReleaseContext(hProvider, 0);
 }
+
+// Fallback to using the Windows API for random bytes
 #else
 #include <fcntl.h>
 #include <unistd.h>
@@ -31,7 +35,7 @@ static void os_random_bytes(uint8_t *buf, size_t len) {
 }
 #endif
 
-// --- ChaCha20 core ---
+// Constants for ChaCha20
 #define ROTL32(v, n) ((v << n) | (v >> (32 - n)))
 #define QUARTERROUND(a,b,c,d) \
     a += b; d ^= a; d = ROTL32(d,16); \
@@ -39,6 +43,7 @@ static void os_random_bytes(uint8_t *buf, size_t len) {
     a += b; d ^= a; d = ROTL32(d, 8); \
     c += d; b ^= c; b = ROTL32(b, 7);
 
+// Generates a 64-byte block of pseudorandom data
 static void chacha20_block(uint32_t out[16], const uint32_t in[16]) {
     int i;
     for (i = 0; i < 16; i++) out[i] = in[i];
@@ -55,12 +60,15 @@ static void chacha20_block(uint32_t out[16], const uint32_t in[16]) {
     for (i = 0; i < 16; i++) out[i] += in[i];
 }
 
+// Context for the CSPRNG
 static struct {
     uint32_t state[16];
     uint8_t buffer[64];
     int buffer_pos;
 } csprng_ctx;
 
+// Initializes the CSPRNG with a key and nonce
+// Key should be 32 bytes, nonce should be 12 bytes
 void csprng_init(const uint8_t *key, const uint8_t *nonce) {
     const uint8_t *constants = (const uint8_t*)"expand 32-byte k";
     memset(&csprng_ctx, 0, sizeof(csprng_ctx));
@@ -105,6 +113,8 @@ void csprng_init(const uint8_t *key, const uint8_t *nonce) {
     csprng_ctx.buffer_pos = 64;
 }
 
+// Refill the buffer with new pseudorandom data
+// This is called when the buffer is exhausted
 static void refill_buffer() {
     uint32_t block[16];
     chacha20_block(block, csprng_ctx.state);
@@ -118,6 +128,8 @@ static void refill_buffer() {
     csprng_ctx.buffer_pos = 0;
 }
 
+// Fill the output buffer with random bytes
+// This will refill the internal buffer as needed
 void csprng_random_bytes(uint8_t *out, size_t len) {
     if (csprng_ctx.buffer_pos >= 64) refill_buffer();
     for (size_t i = 0; i < len; i++) {
@@ -126,6 +138,7 @@ void csprng_random_bytes(uint8_t *out, size_t len) {
     }
 }
 
+// Seed the CSPRNG from a 64-bit integer
 void csprng_seed_from_int(uint64_t seed) {
     uint8_t key[32] = {0};
     uint8_t nonce[12] = {0};

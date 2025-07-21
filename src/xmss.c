@@ -82,6 +82,7 @@ void xmss_keygen(XMSSKey *key) {
     merkle_compute_root(leaves, total_leaves, key->root);
 }
 
+// Keygen with a specific seed (for testing or deterministic generation)
 void xmss_keygen_seeded(XMSSKey *key, const uint8_t seed[XMSS_SEED_BYTES]) {
     memcpy(key->seed, seed, XMSS_SEED_BYTES);
 

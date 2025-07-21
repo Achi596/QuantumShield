@@ -32,21 +32,15 @@ static void base_w(const uint8_t *input, int input_len, int w, int out_len, uint
     while (out < out_len) output[out++] = 0;
 }
 
-/* Legacy random keygen (still used in some tests; not used in deterministic XMSS) */
-void wots_gen_keypair(WOTSKey *key) {
-    for (int i = 0; i < WOTS_LEN; i++) {
-        csprng_random_bytes(key->sk[i], WOTS_N);
-    }
-    wots_compute_pk(key);
-}
-
-/* NEW: compute pk from existing sk */
+/* Compute pk from existing sk */
 void wots_compute_pk(WOTSKey *key) {
     for (int i = 0; i < WOTS_LEN; i++) {
         wots_chain(key->pk[i], key->sk[i], 0, WOTS_W - 1);
     }
 }
 
+// Sign a message using WOTS
+// This computes the signature based on the message hash and the secret key
 void wots_sign(const uint8_t *msg, size_t msg_len, WOTSKey *key, WOTSSignature *sig) {
     uint8_t msg_hash[WOTS_N];
     hash_shake256(msg, msg_len, msg_hash, WOTS_N);
@@ -59,6 +53,8 @@ void wots_sign(const uint8_t *msg, size_t msg_len, WOTSKey *key, WOTSSignature *
     }
 }
 
+// Rebuild the public key from the signature
+// This uses the message hash and the signature to compute the public key
 void wots_pk_from_sig(const uint8_t *msg, size_t msg_len, WOTSSignature *sig,
                       uint8_t pk[WOTS_LEN][WOTS_N]) {
     uint8_t msg_hash[WOTS_N];

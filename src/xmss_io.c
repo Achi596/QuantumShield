@@ -2,13 +2,14 @@
 #include <string.h>
 #include "xmss_io.h"
 
-/* Little-endian helpers */
+/* ---------------- Little-endian helpers ----------------*/
 static void u32le_store(uint8_t b[4], uint32_t x) {
     b[0] = (uint8_t)x;
     b[1] = (uint8_t)(x >> 8);
     b[2] = (uint8_t)(x >> 16);
     b[3] = (uint8_t)(x >> 24);
 }
+
 static uint32_t u32le_load(const uint8_t b[4]) {
     return ((uint32_t)b[0]) |
            ((uint32_t)b[1] << 8) |
@@ -20,6 +21,7 @@ static void u16le_store(uint8_t b[2], uint16_t x) {
     b[0] = (uint8_t)x;
     b[1] = (uint8_t)(x >> 8);
 }
+
 static uint16_t u16le_load(const uint8_t b[2]) {
     return (uint16_t)b[0] | ((uint16_t)b[1] << 8);
 }

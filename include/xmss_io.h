@@ -2,8 +2,8 @@
 #define XMSS_IO_H
 
 #include <stdint.h>
-#include "xmss.h"    /* for XMSSKey, XMSSSignature, params */
-#include "wots.h"    /* for WOTS_W */
+#include "xmss.h"
+#include "wots.h"
 
 /* --- File format constants --- */
 #define XMSS_IO_MAGIC_KEY  0x584D5353u  /* 'XMSS' */

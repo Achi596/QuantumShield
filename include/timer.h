@@ -1,6 +1,7 @@
 #ifndef TIMER_H
 #define TIMER_H
 
-double hires_time_seconds(void);  /* High-resolution time in seconds */
+// High-precision event timer in seconbds.
+double hires_time_seconds(void);
 
 #endif

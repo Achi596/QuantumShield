@@ -2,6 +2,8 @@
 #include <openssl/evp.h>
 #include <stdio.h>
 
+// Hash function using SHAKE256
+// This function takes an input buffer and produces a variable-length output
 void hash_shake256(const uint8_t *in, size_t inlen, uint8_t *out, size_t outlen) {
     EVP_MD_CTX *ctx = EVP_MD_CTX_new();
     if (!ctx) {

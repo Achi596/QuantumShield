@@ -8,19 +8,18 @@
 #define WOTS_N 32      /* bytes per element (MATCH HASH_SIZE) */
 #define WOTS_LEN 67    /* derived for N=32, w=16 */
 
+// Winternitz One-Time Signature (WOTS) key structure
 typedef struct {
     uint8_t sk[WOTS_LEN][WOTS_N];
     uint8_t pk[WOTS_LEN][WOTS_N];
 } WOTSKey;
 
+// Winternitz One-Time Signature (WOTS) signature structure
 typedef struct {
     uint8_t sig[WOTS_LEN][WOTS_N];
 } WOTSSignature;
 
-/* Key generation (random, legacy/testing) */
-void wots_gen_keypair(WOTSKey *key);
-
-/* Recompute pk from sk (used for deterministic derivation) */
+/* Compute pk from sk (used for deterministic derivation) */
 void wots_compute_pk(WOTSKey *key);
 
 /* Sign & rebuild pk from sig */
