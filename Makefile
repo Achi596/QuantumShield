@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Iinclude -Wall
-LDFLAGS = -lssl -lcrypto
+LDFLAGS = -lssl -lcrypto -ljansson
 
 SRC = $(wildcard src/*.c)
 OBJ = $(SRC:.c=.o)

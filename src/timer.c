@@ -17,7 +17,7 @@ double hires_time_seconds(void) {
     return (double)counter.QuadPart / (double)freq.QuadPart;
 }
 
-// Fallback to using the standard time function
+// Fallback to using the standard time function if the Windows API is not available
 #else
 #include <time.h>
 

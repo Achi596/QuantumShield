@@ -34,6 +34,7 @@ typedef struct {
 void xmss_keygen(XMSSKey *key);
 void xmss_keygen_seeded(XMSSKey *key, const uint8_t seed[XMSS_SEED_BYTES]);
 
+/* Key persistence */
 int  xmss_save_key(const XMSSKey *key);
 int  xmss_load_key(XMSSKey *key);
 

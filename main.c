@@ -9,9 +9,15 @@
 #include "xmss_eth.h"
 #include "wots.h"
 #include "hash.h"
+#include "snark_export.h"
 
 #define ROOT_FILE "root.hex"
 #define SIG_FILE  "sig.bin"
+
+XMSSKey global_xmss_key;
+XMSSSignature global_last_signature;
+uint8_t global_last_root[HASH_SIZE];
+uint32_t global_last_index;
 
 /* Convert bytes to hex string */
 static void bytes_to_hex(const uint8_t *in, size_t len, char *out) {
@@ -50,6 +56,7 @@ static int load_root(uint8_t *root) {
         return 0;
     }
 
+    // Convert hex string back to bytes
     for (size_t i = 0; i < HASH_SIZE; i++) {
         int read = sscanf(hex + 2 * i, "%2hhx", &root[i]);
         if (read != 1) {
@@ -60,11 +67,12 @@ static int load_root(uint8_t *root) {
     return 1;
 }
 
-// This function signs a message using XMSS and saves the signature.
+/* Sign a message using XMSS */
 static int mode_sign(const char *message) {
     XMSSKey key;
     XMSSSignature sig;
 
+    // Initialize XMSS key
     if (xmss_load_key(&key)) {
         printf("Key file found! loading existing XMSS key...\n");
     } else {
@@ -77,17 +85,28 @@ static int mode_sign(const char *message) {
         xmss_save_state(0);
     }
 
+    // Sign the message
     xmss_sign_auto((const uint8_t*)message, &key, &sig);
 
+    // Save the signature
     if (!save_root(key.root)) {
         fprintf(stderr, "Failed to save root hex\n");
         return 1;
     }
+
+    // Verify the signature size is below the 4096 bytes limit
     if (xmss_eth_save_sig(SIG_FILE, &sig) != 0) {
         fprintf(stderr, "Failed to save Ethereum compact signature\n");
         return 1;
     }
 
+    // Set global variables for export
+    global_xmss_key = key;
+    global_last_signature = sig;
+    memcpy(global_last_root, key.root, HASH_SIZE);
+    global_last_index = sig.index;
+
+    // Print summary
     size_t sigsz = xmss_eth_sig_size();
     printf("Message: \"%s\"\n", message);
     printf("Root (public key): ");
@@ -99,29 +118,35 @@ static int mode_sign(const char *message) {
     return 0;
 }
 
-
 // This function verifies a message signature using XMSS.
 static int mode_verify(const char *message) {
     XMSSSignature sig;
     uint8_t root[HASH_SIZE];
 
+    // Load the root hash
     if (!load_root(root)) {
         fprintf(stderr, "Missing root.hex\n");
         return 1;
     }
+
+    // Print the loaded root
     printf("Loaded root: ");
     for (int i = 0; i < HASH_SIZE; i++) printf("%02X", root[i]);
     printf("\n");
 
+    // Load the signature
     size_t sig_len = 0;
     int r = xmss_eth_load_sig(SIG_FILE, &sig, &sig_len);
     if (r <= 0) {
         fprintf(stderr, "Missing or invalid %s\n", SIG_FILE);
         return 1;
     }
+
+    // Print the loaded signature
     printf("Loaded signature (index=%d, len=%zu)\n", sig.index, sig_len);
     printf("Message to verify: \"%s\"\n", message);
 
+    // Verify the signature
     int ok = xmss_verify((const uint8_t*)message, &sig, root);
     printf(ok ? "Verification SUCCESS\n" : "Verification FAILED\n");
     return ok ? 0 : 1;
@@ -131,52 +156,83 @@ static int mode_verify(const char *message) {
 /* Usage instructions */
 static void print_usage(const char *prog) {
     printf("Usage:\n");
-    printf("  %s [--seed N] -e \"message\"   # sign message\n", prog);
-    printf("  %s [--seed N] -v \"message\"   # verify message\n", prog);
-    printf("  %s [--seed N] -b [k s v]      # benchmark (defaults 100 1000 1000)\n", prog);
+    printf("  %s [--seed N] -e \"message\"     # Sign a message\n", prog);
+    printf("  %s [--seed N] -v \"message\"     # Verify a message\n", prog);
+    printf("  %s [--seed N] -b [k s v]       # Benchmark (defaults: k=100, s=1000, v=1000)\n", prog);
+    printf("\n");
+    printf("Parameters:\n");
+    printf("  k - number of key generations\n");
+    printf("  s - number of sign operations\n");
+    printf("  v - number of verify operations\n");
+    printf("\n");
+    printf("Options:\n");
+    printf("  --seed N                          Seed value for key generation (optional)\n");
+    printf("  --export-snark <filename.json>    Export snark data to specified JSON file (optional)\n");
 }
+
 
 /* Run benchmarks */
 int main(int argc, char *argv[]) {
-    int arg_index = 1;
     uint64_t custom_seed = 0;
     int seed_set = 0;
+    const char *sign_msg = NULL;
+    const char *snark_outfile = NULL;
 
-    // Check for --seed option
-    if (argc > 2 && strcmp(argv[1], "--seed") == 0) {
-        custom_seed = strtoull(argv[2], NULL, 10);
-        seed_set = 1;
-        arg_index = 3;  // Skip these two arguments
+    // Check for no arguments
+    if (argc == 1) {
+    print_usage(argv[0]);
+    return 1;
     }
 
+    // Parse all args
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--seed") == 0 && i + 1 < argc) {
+            custom_seed = strtoull(argv[++i], NULL, 10);
+            seed_set = 1;
+        } else if (strcmp(argv[i], "-e") == 0 && i + 1 < argc) {
+            sign_msg = argv[++i];
+        } else if (strcmp(argv[i], "--export-snark") == 0 && i + 1 < argc) {
+            snark_outfile = argv[++i];
+        } else if (strcmp(argv[i], "-v") == 0 && i + 1 < argc) {
+            return mode_verify(argv[++i]);
+        } else if (strcmp(argv[i], "-b") == 0) {
+            int k = 10, s = 100, v = 100;
+            if (i + 1 < argc) k = atoi(argv[++i]);
+            if (i + 1 < argc) s = atoi(argv[++i]);
+            if (i + 1 < argc) v = atoi(argv[++i]);
+            run_benchmark(k, s, v);
+            return 0;
+        } else {
+            print_usage(argv[0]);
+            return 1;
+        }
+    }
+
+    // Initialize RNG
     if (seed_set) {
         printf("[CSPRNG] Using deterministic seed: %llu\n", (unsigned long long)custom_seed);
         csprng_seed_from_int(custom_seed);
     } else {
-        csprng_init(NULL, NULL); // default random seed
+        csprng_init(NULL, NULL);
     }
 
-    if (arg_index >= argc) {
-        print_usage(argv[0]);
-        return 1;
+    // Perform signing if requested
+    if (sign_msg) {
+        if (mode_sign(sign_msg) != 0) {
+            fprintf(stderr, "Signing failed.\n");
+            return 1;
+        }
     }
 
-    if (strcmp(argv[arg_index], "-e") == 0 && arg_index + 1 < argc) {
-        return mode_sign(argv[arg_index + 1]);
-    } else if (strcmp(argv[arg_index], "-v") == 0 && arg_index + 1 < argc) {
-        return mode_verify(argv[arg_index + 1]);
-    } else if (strcmp(argv[arg_index], "-b") == 0) {
-        int k = 10, s = 100, v = 100;
-        if (arg_index + 1 < argc) k = atoi(argv[arg_index + 1]);
-        if (arg_index + 2 < argc) s = atoi(argv[arg_index + 2]);
-        if (arg_index + 3 < argc) v = atoi(argv[arg_index + 3]);
-        if (k <= 0) k = 1;
-        if (s <= 0) s = 1;
-        if (v <= 0) v = 1;
-        run_benchmark(k, s, v);
-        return 0;
-    } else {
-        print_usage(argv[0]);
-        return 1;
+    // Export SNARK JSON if requested
+    if (snark_outfile) {
+        if (export_snark_json(snark_outfile, (const uint8_t*)sign_msg, strlen(sign_msg)) == 0) {
+            printf("Exporting SNARK data to %s\n", snark_outfile);
+        } else {
+            fprintf(stderr, "Failed to export SNARK data.\n");
+            return 1;
+        }
     }
+
+    return 0;
 }

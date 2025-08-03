@@ -3,8 +3,8 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include "xmss.h"   /* XMSSSignature, XMSS_TREE_HEIGHT */
-#include "wots.h"   /* WOTS_LEN, HASH_SIZE */
+#include "xmss.h"
+#include "wots.h"
 
 /* Max allowed serialized signature size for Ethereum transaction data payloads. */
 #define XMSS_ETH_SIG_MAX_BYTES 4096

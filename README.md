@@ -37,7 +37,7 @@
 | SHAKE / Tweakable Hash                    | ✅ SHAKE256 used (fixed 32‑byte output) **no domain separation / tweak structure yet**      |
 | Runtime Parameterization (`w`, `h`)       | ❌ Current build uses compile-time constants                                                |
 | Side-channel Hardening                    | ❌ Not constant-time; no memory cleansing                                                   |
-
+| Multi-sig Aggregation (SNARK)             | ✅ Includes JSON export of aggregated signatures and proofs for interoperability and verification
 
 ---
 
@@ -46,6 +46,7 @@
 ### Libraries / Tools
 - C compiler (GCC or Clang)
 - OpenSSL development headers & libraries (for RNG + hash)
+- Jansson library (for JSON handling)
 - Make
 
 ---
@@ -78,19 +79,29 @@ make
 
 ## CLI Usage
 ```bash
-hashsig [--seed N] -e "message"          # Sign: generate or load key, sign message, save state
-hashsig [--seed N] -v "message"          # Verify: load root + signature, check vs message
-hashsig [--seed N] -b [k s v]            # Benchmark: sign/verify loops (defaults 100 1000 1000)
+hashsig -e "message"          # Sign: generate or load key, sign message, save state
+hashsig -v "message"          # Verify: load root + signature, check vs message
+hashsig -b [k s v]            # Benchmark: sign/verify loops (defaults 100 1000 1000)
+
+Parameters:
+    [k]       # number of key generations
+    [s]       # number of sign operations
+    [v]       # number of verify operations
+
+Options:
+    --seed N                            # Seed value for key generation (optional)
+    --export-snark <filename.json>      # Export snark data to specified JSON file  (optional)
 ```
 
 ## Arguments
 
 | Option      | Meaning                                             | Notes                                                              |
 |-------------|-----------------------------------------------------|--------------------------------------------------------------------|
-| `--seed N`  | Use deterministic RNG seed for reproducible testing | Optional; accepts uint64_t decimal values.                         |
 | `-e "msg"`  | Sign message string                                 | Creates/loads a key and advances XMSS index.                       |
 | `-v "msg"`  | Verify signed message                               | Uses `root.hex` (root key in hex) and `sig.bin` (binary signature).|
 | `-b [k s v]`| Benchmark operations: keygen, sign, verify runs     | Defaults to 100 keygen, 1000 sign, 1000 verify runs.               |
+| `--seed N`  | Use deterministic RNG seed for reproducible testing | Optional; accepts uint64_t decimal values.                         |
+| `--export-snark <file>` | Export SNARK data related to signatures to JSON file | Optional; outputs signature and proof data in JSON format.          |
 
 ## Files Written
 
@@ -101,5 +112,4 @@ hashsig [--seed N] -b [k s v]            # Benchmark: sign/verify loops (default
 | `root.hex`       | Public root hash (hex)             | Saved on sign                |
 | `sig.bin`        | Last signature produced            | Saved on sign                |
 | `bench.csv`      | Benchmark results append log       | Benchmark mode               |
-
-
+| `<filename>.json`| Exported SNARK signature and proof data in JSON format | Created when using `--export-snark` option |
