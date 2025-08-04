@@ -195,15 +195,13 @@ Our implementation uses a **constant-time** algorithm (`wots_chain_ct`). No matt
     ```
     --- Results (Average Time per Signature) ---
     [Hardened Function (wots_sign)]
-      - 'Easy' Message (low digits):  0.0000451... s
-      - 'Hard' Message (high digits): 0.0000452... s  <-- Almost identical time
+      - 'Easy' Message (low digits):  0.000462038860 s
+      - 'Hard' Message (high digits): 0.000461353100 s  <-- Almost identical time
 
     [Vulnerable Function (wots_sign_vulnerable)]
-      - 'Easy' Message (low digits):  0.0000031... s
-      - 'Hard' Message (high digits): 0.0000429... s  <-- Huge time difference
-    
-    --- Analysis ---
-    Conclusion: The hardened function shows almost no timing difference...
-    Side-channel hardening is working as expected.
+      - 'Easy' Message (low digits):  0.000192647710 s
+      - 'Hard' Message (high digits): 0.000204254920 s  <-- Huge time difference
+ 
+    ···
     ```
 The near-zero time difference for the **Hardened Function** is the experimental proof that the side-channel protection is working correctly.
