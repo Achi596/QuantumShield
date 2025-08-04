@@ -2,30 +2,31 @@
 #define WOTS_H
 
 #include <stdint.h>
+#include "hash.h"
+#include "xmss_config.h"
 
-#define WOTS_W 16 // Base for WOTS (WOTS+ uses base-16)
-#define WOTS_LOG_W 4  // log2(16)
-#define WOTS_N 32     // Hash output size in bytes
-
-// Length calculations
-#define WOTS_LEN1 (8 * WOTS_N / WOTS_LOG_W)              // # of message blocks
-#define WOTS_LEN2 ((WOTS_LOG_W + 1) / WOTS_LOG_W)        // # of checksum blocks
-#define WOTS_LEN (WOTS_LEN1 + WOTS_LEN2)                 // Total number of blocks
-
-// Key and signature structures
+// Key and signature structures now use pointers for dynamic allocation
 typedef struct {
-    uint8_t sk[WOTS_LEN][WOTS_N];  // Secret key
-    uint8_t pk[WOTS_LEN][WOTS_N];  // Public key
+    uint8_t **sk; // Secret key: [wots_len][HASH_SIZE]
+    uint8_t **pk; // Public key: [wots_len][HASH_SIZE]
 } WOTSKey;
 
-// Signature structure
 typedef struct {
-    uint8_t sig[WOTS_LEN][WOTS_N];
+    uint8_t **sig; // Signature: [wots_le  n][HASH_SIZE]
 } WOTSSignature;
 
-// Function declarations
-void wots_compute_pk(WOTSKey *key);
-void wots_sign(const uint8_t *msg, size_t msg_len, WOTSKey *key, WOTSSignature *sig);
-void wots_verify(const uint8_t *msg, const WOTSSignature *sig, WOTSKey *pk);
+// Memory management for dynamic WOTS structures
+int wots_alloc_key(WOTSKey *key, const xmss_params *params);
+void wots_free_key(WOTSKey *key, const xmss_params *params);
+int wots_alloc_sig(WOTSSignature *sig, const xmss_params *params);
+void wots_free_sig(WOTSSignature *sig, const xmss_params *params);
+
+// Function declarations updated to accept xmss_params
+void wots_compute_pk(const xmss_params *params, WOTSKey *key);
+void wots_sign(const xmss_params *params, const uint8_t *msg, size_t msg_len, WOTSKey *key, WOTSSignature *sig);
+void wots_verify(const xmss_params *params, const uint8_t *msg, const WOTSSignature *sig, WOTSKey *pk);
+
+// Declaration for the vulnerable function, for testing purposes only.
+void wots_sign_vulnerable(const xmss_params *params, const uint8_t *msg, size_t msg_len, WOTSKey *key, WOTSSignature *sig);
 
 #endif
