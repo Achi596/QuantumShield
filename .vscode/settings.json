@@ -2,7 +2,8 @@
     "files.associations": {
         "HASH.C": "cpp",
         "rand.h": "c",
-        "stdint.h": "c"
+        "stdint.h": "c",
+        "xmss_config.h": "c"
     },
     "C_Cpp.default.compilerPath": "C:/msys64/ucrt64/bin/gcc.exe",
 

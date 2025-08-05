@@ -11,9 +11,16 @@
 #include "wots.h"
 #include "hash.h"
 #include "xmss_config.h"
+#include "snark_export.h"
+
 
 #define ROOT_FILE "root.hex"
 #define SIG_FILE  "sig.bin"
+
+XMSSKey global_xmss_key;
+XMSSSignature global_last_signature;
+uint8_t global_last_root[HASH_SIZE];
+uint32_t global_last_index;
 
 // Global params, initialized based on CLI args
 static xmss_params g_params;
@@ -69,12 +76,13 @@ static int mode_sign(const char *message) {
 
     int key_loaded = xmss_load_key(&key, &params_from_file);
 
-    if (key_loaded) {
-        printf("Key file found! loading existing XMSS key (h=%d, w=%d)...\n", params_from_file.h, params_from_file.w);
-        if(params_from_file.h != g_params.h || params_from_file.w != g_params.w) {
-            fprintf(stderr, "ERROR: CLI parameters (h=%d, w=%d) do not match key file parameters.\n", g_params.h, g_params.w);
-            return 1;
-        }
+if (key_loaded) {
+    printf("Key file found loading existing XMSS key (h=%d, w=%d)...\n", params_from_file.h, params_from_file.w);
+    if(params_from_file.h != g_params.h || params_from_file.w != g_params.w) {
+        fprintf(stderr, "ERROR: Current parameters (h=%d, w=%d) do not match existing key file parameters.\n", g_params.h, g_params.w);
+        fprintf(stderr, "Please verify your configuration and delete or move the old key file if you wish to continue with these new parameters.\n");
+        return 1; // Return an error code indicating that parameters don't match
+    }
     } else {
         printf("Generating new XMSS key (h=%d, w=%d)...\n", g_params.h, g_params.w);
         xmss_keygen(&g_params, &key);
@@ -98,6 +106,12 @@ static int mode_sign(const char *message) {
         xmss_free_sig(&sig, &g_params);
         return 1;
     }
+
+    // Set global variables for export
+    global_xmss_key = key;
+    global_last_signature = sig;
+    memcpy(global_last_root, key.root, HASH_SIZE);
+    global_last_index = sig.index;
     
     size_t sigsz = xmss_eth_sig_size(&g_params);
     printf("Message: \"%s\"\n", message);
@@ -153,31 +167,47 @@ static void print_usage(const char *prog) {
 
 /* Run benchmarks */
 int main(int argc, char *argv[]) {
-    int h = 0, w = 0;
+    int h = 5, w = 8; // Default parameters
     uint64_t custom_seed = 0;
     bool seed_set = false;
+    const char *sign_msg = NULL;
+    const char *snark_outfile = NULL;
     char *mode = NULL, *message = NULL;
-    int bench_k = 10, bench_s = 100, bench_v = 100;
+
+    int k = 10, s = 100, v = 100;
 
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--height") == 0 && i + 1 < argc) {
+        if (strcmp(argv[i], "-e") == 0 && i + 1 < argc) {
+            mode = "-e";
+            sign_msg = argv[++i];
+        } else if (strcmp(argv[i], "-v") == 0 && i + 1 < argc) {
+            mode = "-v";
+            message = argv[++i];
+        } else if (strcmp(argv[i], "-b") == 0) {
+            mode = "-b";
+            if (i + 1 < argc) k = atoi(argv[++i]);
+            if (i + 1 < argc) s = atoi(argv[++i]);
+            if (i + 1 < argc) v = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--height") == 0 && i + 1 < argc) {
             h = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--wots") == 0 && i + 1 < argc) {
             w = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--seed") == 0 && i + 1 < argc) {
+            if (mode == NULL || strcmp(mode, "-e") != 0) {
+                fprintf(stderr, "--seed is only allowed with -e\n");
+                return 1;
+            }
             custom_seed = strtoull(argv[++i], NULL, 10);
             seed_set = true;
-        } else if (strcmp(argv[i], "-e") == 0 && i + 1 < argc) {
-            mode = "-e"; message = argv[++i];
-        } else if (strcmp(argv[i], "-v") == 0 && i + 1 < argc) {
-            mode = "-v"; message = argv[++i];
-        } else if (strcmp(argv[i], "-b") == 0) {
-            mode = "-b";
-            if (i + 1 < argc && argv[i+1][0] != '-') bench_k = atoi(argv[++i]);
-            if (i + 1 < argc && argv[i+1][0] != '-') bench_s = atoi(argv[++i]);
-            if (i + 1 < argc && argv[i+1][0] != '-') bench_v = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--export-snark") == 0 && i + 1 < argc) {
+            if (mode == NULL || strcmp(mode, "-e") != 0) {
+                fprintf(stderr, "--export-snark is only allowed with -e\n");
+                return 1;
+            }
+            snark_outfile = argv[++i];
         } else {
-             print_usage(argv[0]); return 1;
+            print_usage(argv[0]);
+            return 1;
         }
     }
     
@@ -195,8 +225,10 @@ int main(int argc, char *argv[]) {
         if (xmss_params_init(&g_params, h, w) != 0) {
             return 1;
         }
+    
     }
 
+    // Initialize RNG
     if (seed_set) {
         printf("[CSPRNG] Using deterministic seed: %llu\n", (unsigned long long)custom_seed);
         csprng_seed_from_int(custom_seed);
@@ -204,18 +236,34 @@ int main(int argc, char *argv[]) {
         csprng_init(NULL, NULL);
     }
     
+    // Perform signing if requested
     if (strcmp(mode, "-e") == 0) {
-        return mode_sign(message);
+        if (mode_sign(sign_msg) != 0) {
+            fprintf(stderr, "Signing failed.\n");
+            return 1;
+        }
+    
+    } else if (strcmp(mode, "-b") == 0) {
+        run_benchmark(&g_params, k, s, v);
+        return 0;
+    
     } else if (strcmp(mode, "-v") == 0) {
         return mode_verify(message);
-    } else if (strcmp(mode, "-b") == 0) {
-        if (bench_k <= 0) bench_k = 1;
-        if (bench_s <= 0) bench_s = 1;
-        if (bench_v <= 0) bench_v = 1;
-        run_benchmark(&g_params, bench_k, bench_s, bench_v);
-        return 0;
     } else {
         print_usage(argv[0]);
-        return 1;
+        return -1;
     }
+
+    // Export SNARK JSON if requested
+    if (snark_outfile) {
+        printf("Exporting SNARK data to %s\n", snark_outfile);
+        
+        // Assuming export_snark_json() returns a status code as an int. Adjust the type of sign_msg and h, w if needed.
+        if (export_snark_json(snark_outfile, (const uint8_t*)sign_msg, strlen(sign_msg), h, w) != 0) { 
+            fprintf(stderr, "Failed to export SNARK data.\n");
+            return 1; // Return an error code indicating that the operation failed
+        }
+    }
+
+    return 0;
 }

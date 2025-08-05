@@ -4,6 +4,6 @@
 #include <stdint.h>
 
 // Export SNARK data to JSON format
-int export_snark_json(const char *filename, const uint8_t *msg, size_t msg_len);
+int export_snark_json(const char *filename, const uint8_t *msg, size_t msg_len, int h, int w);
 
 #endif
