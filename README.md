@@ -26,23 +26,25 @@
 
 ## Features
 
-| Feature                                   | Status                                                                                     |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------ |
-| WOTS+ Chains                              | ✅ Implemented                                                                              |
-| Merkle Root                               | ✅ Computed from WOTS pk hashes                                                             |
-| Auth Path in Signature                    | ✅ Included; signer builds path, verifier recomputes root                                   |
-| Proper Root Reconstruction                | ✅ Working via Merkle auth path verification                                                |
-| Index Reuse Protection                    | ✅ Persistent state (`xmss_state.dat`); auto key rotation when leaves exhausted             |
-| Deterministic PRNG Seeding                | ✅ Optional `--seed N` argument for reproducible testing                                    |
-| CSPRNG                                    | ✅ OpenSSL `RAND_bytes()` backend (ChaCha/DRBG depending on build)                          |
-| Serialization                             | ✅ Raw struct dumps to disk (`xmss_key.bin`, `sig.bin`)                                     |
-| Benchmark Mode                            | ✅ Measures sign/verify, logs CSV                                                           |
-| SHAKE / Tweakable Hash                    | ✅ SHAKE256 used (fixed 32‑byte output) **no domain separation / tweak structure yet**      |
-| Runtime Parameterization (`w`, `h`)       | ✅ Implemented. Set via `--height <h>` and `--wots <w>` command-line arguments.                                                |
-| Side-channel Hardening                    | ✅ Implemented. Constant-time WOTS+ chains and secure memory wiping for sensitive data.                                                   |
+## ✅ XMSS Implementation Feature Checklist
+
+| **Feature**                              | **Status**                                                                                   |
+|------------------------------------------|----------------------------------------------------------------------------------------------|
+| **WOTS+ Chains**                         | ✅ Implemented                                                                               |
+| **Merkle Root**                          | ✅ Derived from WOTS+ public key hashes                                                      |
+| **Authentication Path in Signature**     | ✅ Included in signature; verifier recomputes Merkle root                                    |
+| **Proper Root Reconstruction**           | ✅ Verified using the authentication path                                                    |
+| **Index Reuse Protection**               | ✅ Persistent state via `xmss_state.dat`; auto key rotation when all leaves are used         |
+| **Deterministic PRNG Seeding**           | ✅ Optional `--seed <N>` argument for reproducible testing                                   |
+| **CSPRNG**                               | ✅ Backed by OpenSSL `RAND_bytes()` (ChaCha20/DRBG depending on build configuration)         |
+| **Serialization**                        | ✅ Raw binary dumps to disk (`xmss_key.bin`, `sig.bin`)                                      |
+| **Benchmark Mode**                       | ✅ Measures sign/verify performance and logs results in CSV format                           |
+| **Quantum-Resistant Hashing**            | ✅ SHAKE256 used with fixed 32-byte output                                                   |
+| **Runtime Parameterization**             | ✅ Parameters `w` and `h` configurable via CLI: `--wots <w>`, `--height <h>`                 |
+| **Side-Channel Hardening**               | ✅ Constant-time WOTS+ chains; secure memory clearing of sensitive buffers                   |
+| **Multi-Signature Aggregation (SNARK)**  | ✅ SNARK-export mode outputs JSON with `{message, index, root, WOTS sig, auth path}` for easy verification by validators         |
 
 
----
 
 ## Build Requirements
 
@@ -66,58 +68,47 @@ make
 1. Install MSYS2, open **MSYS2 UCRT64** shell.
 2. Install toolchain + OpenSSL:
     ```bash
-    pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-openssl make
+    pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-openssl mingw-w64-ucrt-x86_64-jansson make
     ```
 3. Clone & build:
     ```bash
-    git https://github.com/Achi596/QuantumShield
+    git clone https://github.com/Achi596/QuantumShield
     cd QuantumShield
     make
     ```
 4. Run:
     ```bash
-    ./hashsig --height 10 --wots 16 -e "hello world"
+    ./hashsig -e "hello world"
     ```
 
 ## CLI Usage
-The project now builds two separate executables: `hashsig` for core functionality and `time_test` for security analysis.
-
-### Main Program: hashsig
 ```bash
-# Sign a message (generates a key on first run)
-./hashsig --height <h> --wots <w> -e "your message"
+Mode:
+    ./hashsig -e "message"          # Sign: generate or load key, sign message, save state
+    ./hashsig -v "message"          # Verify: load root + signature, check vs message
+    ./hashsig -b [k s v]            # Benchmark: sign/verify loops (defaults 100 1000 1000)
 
-# Verify a message (parameters are read from the signature file)
-./hashsig -v "your message"
+Benchmarking Options:
+    [k]       # Number of key generations
+    [s]       # Number of sign operations
+    [v]       # Number of verify operations
 
-# Run a benchmark with custom parameters
-./hashsig --height <h> --wots <w> -b [keygen_runs sign_runs verify_runs]
-
-# Use a deterministic seed for reproducible results
-./hashsig --height <h> --wots <w> --seed 12345 -e "a deterministic signature"
+Optional Parameters (used with sign or benchmark):
+    --height <h>                      # Set XMSS Merkle tree height (default = 5)
+    --wots <w>                        # Set WOTS+ Winternitz parameter (default = 8, must be power of 2)
+    --seed N                          # Deterministic RNG seed for reproducibility
+    --export-snark <filename.json>    # Export SNARK data to JSON file
 ```
-### Side-Channel Test Program: time_test
-This special program demonstrates the effectiveness of the side-channel hardening.
-
-```bash
-./time_test
-```
-*(See the "Advanced Testing" section below for more details on how to interpret its output.)*
-
----
 
 ## Arguments
 
-| Option                   | Meaning                                                         | Notes                                                                              |
-|--------------------------|-----------------------------------------------------------------|------------------------------------------------------------------------------------|
-| `--height <h>`           | Set the XMSS Merkle tree height to `h`.                         | Required for signing (`-e`) and benchmarking (`-b`). Larger `h` = more signatures per key. |
-| `--wots <w>`             | Set the WOTS+ Winternitz parameter to `w`.                      | Required for signing and benchmarking. Must be a power of 2 (e.g., 4, 16, 256).      |
-| `--seed N`               | Use a deterministic RNG seed `N` for reproducible testing.      | Optional. Accepts a 64-bit unsigned integer.                                         |
-| `-e "message"`           | **Sign** the given message string.                              | Creates/loads a key, advances the state, and saves the signature.                    |
-| `-v "message"`           | **Verify** the signature against the given message.             | Uses `root.hex` and `sig.bin`. Does not require `--height` or `--wots`.            |
-| `-b [k s v]`             | **Benchmark** keygen, sign, and verify operations.              | Arguments for runs are optional. Defaults to 10 keygen, 100 sign, 100 verify runs. |
-
----
+| Option      | Meaning                                             | Notes                                                              |
+|-------------|-----------------------------------------------------|--------------------------------------------------------------------|
+| `-e "msg"`  | Sign message string                                 | Creates/loads a key and advances XMSS index.                       |
+| `-v "msg"`  | Verify signed message                               | Uses `root.hex` (root key in hex) and `sig.bin` (binary signature).|
+| `-b [k s v]`| Benchmark operations: keygen, sign, verify runs     | Defaults to 100 keygen, 1000 sign, 1000 verify runs.               |
+| `--seed N`  | Use deterministic RNG seed for reproducible testing | Optional; accepts uint64_t decimal values.                         |
+| `--export-snark <file>` | Export SNARK data related to signatures to JSON file | Optional; outputs signature and proof data in JSON format.          |
 
 ## Files Written
 
@@ -128,6 +119,7 @@ This special program demonstrates the effectiveness of the side-channel hardenin
 | `root.hex`       | Public root hash (hex string)                              | Saved on sign                      |
 | `sig.bin`        | Last signature produced + parameters (`h`, `w`)            | Saved on sign                      |
 | `bench.csv`      | Benchmark results append-log                               | Benchmark mode (`-b`)              |
+| `<filename>.json`| Exported SNARK signature and proof data in JSON format | Created when using `--export-snark` option |
 
 ---
 
@@ -170,7 +162,12 @@ This feature protects the implementation against timing attacks, where an attack
 
 ---
 
-## Advanced Testing: Demonstrating Side-Channel Hardening
+### Advanced Testing - Side-Channel Verification Program: time_test
+This special program demonstrates the effectiveness of the side-channel hardening:
+
+```bash
+./time_test
+```
 
 A critical security feature of this implementation is its hardening against **timing attacks**. This is not something that can be observed through normal sign/verify operations. We have therefore created a dedicated `time_test` executable to prove its effectiveness.
 
