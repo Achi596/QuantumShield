@@ -154,15 +154,21 @@ static int mode_verify(const char *message) {
 
 /* Usage instructions */
 static void print_usage(const char *prog) {
-    printf("Usage: %s [params] [options]\n", prog);
-    printf("\nParameters (Required for sign/benchmark, optional for verify):\n");
-    printf("  --height <h>      Set XMSS Merkle tree height\n");
-    printf("  --wots <w>        Set WOTS+ Winternitz parameter (power of 2)\n");
-    printf("\nOptions:\n");
-    printf("  -e \"message\"      Sign message\n");
-    printf("  -v \"message\"      Verify message\n");
-    printf("  -b [k s v]        Benchmark (keygen, sign, verify runs)\n");
-    printf("  --seed N          Use deterministic RNG seed\n");
+    printf("Usage: %s [mode] [parameters] [options]\n", prog);
+    printf("\nMode:\n");
+    printf("  -e \"message\"     # Sign a message\n");
+    printf("  -v \"message\"     # Verify a message\n");
+    printf("  -b [k s v]         # Benchmark (defaults: k=100, s=1000, v=1000)\n");
+    printf("\nBenchmarking Options:\n");
+    printf("  [k]                # Number of key generations\n");
+    printf("  [s]                # Number of sign operations\n");
+    printf("  [v]                # Number of verify operations\n");
+    printf("\nParameters (Optional, for use with sign or benchmark):\n");
+    printf("  --height <h>       Set XMSS Merkle tree height (Default=5)\n");
+    printf("  --wots <w>         Set WOTS+ Winternitz parameter (Default=8, must be to the (Default=5)power of 2)\n");
+    printf("  --seed N           Use deterministic RNG seed\n");
+    printf("  --export-snark     <filename.json>    Export snark data to specified JSON file (optional)\n");
+
 }
 
 /* Run benchmarks */
