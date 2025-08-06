@@ -7,9 +7,12 @@
 
 /* --- Memory Management --- */
 int xmss_alloc_sig(XMSSSignature *sig, const xmss_params *params) {
+    if (!sig || !params) return -1;  // Defensive checks
+
     sig->wots_sig = malloc(sizeof(WOTSSignature));
     if (!sig->wots_sig || wots_alloc_sig(sig->wots_sig, params) != 0) {
         free(sig->wots_sig);
+        sig->wots_sig = NULL;
         return -1;
     }
 
@@ -17,6 +20,7 @@ int xmss_alloc_sig(XMSSSignature *sig, const xmss_params *params) {
     if (!sig->auth_path) {
         wots_free_sig(sig->wots_sig, params);
         free(sig->wots_sig);
+        sig->wots_sig = NULL;
         return -1;
     }
     for (int i = 0; i < params->h; i++) {
@@ -24,25 +28,32 @@ int xmss_alloc_sig(XMSSSignature *sig, const xmss_params *params) {
         if (!sig->auth_path[i]) {
             for (int j = 0; j < i; j++) free(sig->auth_path[j]);
             free(sig->auth_path);
+            sig->auth_path = NULL;
             wots_free_sig(sig->wots_sig, params);
             free(sig->wots_sig);
+            sig->wots_sig = NULL;
             return -1;
         }
     }
+
     return 0;
 }
 
 void xmss_free_sig(XMSSSignature *sig, const xmss_params *params) {
     if (!sig) return;
+
     if (sig->auth_path) {
         for (int i = 0; i < params->h; i++) {
             free(sig->auth_path[i]);
         }
         free(sig->auth_path);
+        sig->auth_path = NULL;
     }
+
     if (sig->wots_sig) {
         wots_free_sig(sig->wots_sig, params);
         free(sig->wots_sig);
+        sig->wots_sig = NULL;
     }
 }
 
