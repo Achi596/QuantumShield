@@ -181,7 +181,11 @@ Our implementation uses a **constant-time** algorithm (`wots_chain_ct`). No matt
 
 ### How to Test It
 
-1.  **Build the test program**: The `time_test` executable is built automatically when you run `make`.
+1.  **Build the test program**:
+    ```bash
+    cd tests
+    make
+    ```
 2.  **Run the test**:
     ```bash
     ./time_test
@@ -201,4 +205,4 @@ Our implementation uses a **constant-time** algorithm (`wots_chain_ct`). No matt
  
     ···
     ```
-The near-zero time difference for the **Hardened Function** is the experimental proof that the side-channel protection is working correctly.
+The near-zero time difference for the **Hardened Function** is the experimental proof that the side-channel protection is working correctly. The hardened function shows almost no timing difference between easy and hard messages. The vulnerable function is significantly faster for the 'easy' message, leaking timing information. Side-channel hardening is working as expected.
