@@ -1,0 +1,2 @@
+timestamp,h,w,keygen_runs,sign_runs,verify_runs,keygen_avg_s,sign_avg_s,verify_avg_s,key_size_bytes,sig_size_bytes,root_size_bytes
+1754617748,5,8,1,1,1,0.026792800,0.024597800,0.000384600,64,3012,32
