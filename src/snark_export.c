@@ -1,19 +1,23 @@
+// import standard libraries
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include <jansson.h>  // Ensure you link with -ljansson
 
+// import project-specific headers
+#include <jansson.h>
 #include "snark_export.h"
 #include "xmss.h"
 #include "wots.h"
 #include "hash.h"
 
+// Global variables for export
 extern XMSSKey global_xmss_key;
 extern XMSSSignature global_last_signature;
 extern uint8_t global_last_root[HASH_SIZE];
 extern uint32_t global_last_index;
 
+// Function to export SNARK data to JSON
 int export_snark_json(const char *filename, const uint8_t *msg, size_t msg_len, int h, int w) {
     json_t *root = json_object();
 
@@ -63,6 +67,7 @@ int export_snark_json(const char *filename, const uint8_t *msg, size_t msg_len, 
         return -1;
     }
 
+    // Clean up
     json_decref(root);
     return 0;
 }

@@ -1,5 +1,7 @@
+// import standard libraries
 #include "timer.h"
 
+// Check if using widows, if true, use Windows-specific high-resolution timer
 #if defined(_WIN32) || defined(_WIN64)
 #define USE_QPC
 #include <windows.h>

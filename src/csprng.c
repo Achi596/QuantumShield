@@ -1,24 +1,36 @@
-#include "csprng.h"
+// import standard libraries
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
+// import project-specific headers
+#include "csprng.h"
+
+// import project-specific headers
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
 #include <wincrypt.h>
 
-// Windows CSPRNG using CryptGenRandom
+// Windows CSPRNG implementation using CryptGenRandom
 static void os_random_bytes(uint8_t *buf, size_t len) {
+
+    // Create a handle for the cryptographic provider
     HCRYPTPROV hProvider = 0;
+
+    // Acquire a cryptographic provider context
     if (!CryptAcquireContext(&hProvider, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT)) {
         fprintf(stderr, "CSPRNG: CryptAcquireContext failed.\n");
         exit(1);
     }
+
+    // Call CryptGenRandom to fill the buffer with random bytes
     if (!CryptGenRandom(hProvider, (DWORD)len, buf)) {
         fprintf(stderr, "CSPRNG: CryptGenRandom failed.\n");
         exit(1);
     }
+
+    // Release the cryptographic provider context
     CryptReleaseContext(hProvider, 0);
 }
 
@@ -26,6 +38,8 @@ static void os_random_bytes(uint8_t *buf, size_t len) {
 #else
 #include <fcntl.h>
 #include <unistd.h>
+
+// POSIX CSPRNG implementation using /dev/urandom
 static void os_random_bytes(uint8_t *buf, size_t len) {
     int fd = open("/dev/urandom", O_RDONLY);
     if (fd < 0) { perror("open /dev/urandom"); exit(1); }
@@ -35,7 +49,8 @@ static void os_random_bytes(uint8_t *buf, size_t len) {
 }
 #endif
 
-// Constants for ChaCha20
+// This is a simple implementation of the ChaCha20 stream cipher
+// It generates 64-byte blocks of pseudorandom data
 #define ROTL32(v, n) ((v << n) | (v >> (32 - n)))
 #define QUARTERROUND(a,b,c,d) \
     a += b; d ^= a; d = ROTL32(d,16); \
@@ -43,7 +58,7 @@ static void os_random_bytes(uint8_t *buf, size_t len) {
     a += b; d ^= a; d = ROTL32(d, 8); \
     c += d; b ^= c; b = ROTL32(b, 7);
 
-// Generates a 64-byte block of pseudorandom data
+// Generates the 64-byte blocks of pseudorandom data
 static void chacha20_block(uint32_t out[16], const uint32_t in[16]) {
     int i;
     for (i = 0; i < 16; i++) out[i] = in[i];
@@ -73,6 +88,7 @@ void csprng_init(const uint8_t *key, const uint8_t *nonce) {
     const uint8_t *constants = (const uint8_t*)"expand 32-byte k";
     memset(&csprng_ctx, 0, sizeof(csprng_ctx));
 
+    // Initialize the state
     csprng_ctx.state[0]  = ((uint32_t)constants[0])  | ((uint32_t)constants[1]<<8) |
                            ((uint32_t)constants[2]<<16) | ((uint32_t)constants[3]<<24);
     csprng_ctx.state[1]  = ((uint32_t)constants[4])  | ((uint32_t)constants[5]<<8) |
@@ -82,12 +98,14 @@ void csprng_init(const uint8_t *key, const uint8_t *nonce) {
     csprng_ctx.state[3]  = ((uint32_t)constants[12]) | ((uint32_t)constants[13]<<8) |
                            ((uint32_t)constants[14]<<16) | ((uint32_t)constants[15]<<24);
 
+    // If key or nonce is NULL, use random bytes
     uint8_t key_buf[32];
     uint8_t nonce_buf[12];
 
     if (key == NULL) os_random_bytes(key_buf, sizeof(key_buf)); else memcpy(key_buf, key, 32);
     if (nonce == NULL) os_random_bytes(nonce_buf, sizeof(nonce_buf)); else memcpy(nonce_buf, nonce, 12);
 
+    // Fill the state with the key
     for (int i = 0; i < 8; i++) {
         csprng_ctx.state[4 + i] =
             ((uint32_t)key_buf[i*4 + 0]) |
@@ -96,6 +114,7 @@ void csprng_init(const uint8_t *key, const uint8_t *nonce) {
             ((uint32_t)key_buf[i*4 + 3] << 24);
     }
 
+    // Fill the nonce part of the state
     csprng_ctx.state[12] = 0; // counter
     csprng_ctx.state[13] = ((uint32_t)nonce_buf[0])  |
                            ((uint32_t)nonce_buf[1]<<8) |
@@ -113,8 +132,7 @@ void csprng_init(const uint8_t *key, const uint8_t *nonce) {
     csprng_ctx.buffer_pos = 64;
 }
 
-// Refill the buffer with new pseudorandom data
-// This is called when the buffer is exhausted
+// When the buffer is exhausted, Refill it with new pseudorandom data
 static void refill_buffer() {
     uint32_t block[16];
     chacha20_block(block, csprng_ctx.state);
@@ -143,7 +161,7 @@ void csprng_seed_from_int(uint64_t seed) {
     uint8_t key[32] = {0};
     uint8_t nonce[12] = {0};
 
-    // Expand seed into key and nonce (simple way: fill with repeated seed)
+    // Expand seed into key and nonce
     for (int i = 0; i < 32; i += 8) {
         key[i + 0] = (seed >> 0) & 0xFF;
         key[i + 1] = (seed >> 8) & 0xFF;
@@ -155,9 +173,11 @@ void csprng_seed_from_int(uint64_t seed) {
         key[i + 7] = (seed >> 56) & 0xFF;
     }
 
+    // Fill nonce with the first 12 bytes of the seed
     for (int i = 0; i < 12; i++) {
         nonce[i] = (seed >> (i % 8) * 8) & 0xFF;
     }
 
+    // Initialize the CSPRNG with the key and nonce
     csprng_init(key, nonce);
 }

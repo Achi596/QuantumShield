@@ -6,7 +6,6 @@
 
 // Struct to hold all runtime-configurable XMSS/WOTS parameters
 typedef struct {
-    // Core parameters
     int h;          // XMSS tree height
     int w;          // WOTS+ Winternitz parameter
 
@@ -20,13 +19,10 @@ typedef struct {
     uint64_t max_keys; // 2^h
 } xmss_params;
 
-/**
- * @brief Initializes the parameter structure based on h and w.
- * @param params The parameter struct to initialize.
- * @param h The XMSS tree height.
- * @param w The WOTS+ Winternitz parameter (must be a power of 2).
- * @return 0 on success, -1 on failure (e.g., invalid w).
- */
+// Calculate log2 for integer powers of 2
+int int_log2(int n);
+
+// Initializes the parameter structure based on h and w.
 int xmss_params_init(xmss_params *params, int h, int w);
 
 #endif

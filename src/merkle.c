@@ -1,8 +1,11 @@
+// import standard libraries
 #include <string.h>
+
+// import project-specific headers
 #include "merkle.h"
 #include "hash.h"
 
-/* Compute Merkle root from an array of leaves */
+// Compute Merkle root from an array of leaves
 void merkle_compute_root(const uint8_t leaves[][HASH_SIZE], int num_leaves, uint8_t root[HASH_SIZE]) {
     if (num_leaves == 1) {
         memcpy(root, leaves[0], HASH_SIZE);
@@ -10,8 +13,7 @@ void merkle_compute_root(const uint8_t leaves[][HASH_SIZE], int num_leaves, uint
     }
 
     int level_nodes = num_leaves;
-    /* Copy leaves into a working buffer */
-    /* For small trees a VLA is fine; for bigger trees allocate dynamically */
+    // Copy leaves into a working buffer allocate dynamically as needed
     uint8_t level[level_nodes][HASH_SIZE];
     memcpy(level, leaves, num_leaves * HASH_SIZE);
 
@@ -28,7 +30,7 @@ void merkle_compute_root(const uint8_t leaves[][HASH_SIZE], int num_leaves, uint
     memcpy(root, level[0], HASH_SIZE);
 }
 
-/* Build auth path for a given leaf index and also recompute root */
+// Build auth path for a given leaf index and also recompute root
 void merkle_auth_path(const uint8_t leaves[][HASH_SIZE], int num_leaves, int leaf_index,
                       uint8_t auth_path[][HASH_SIZE], uint8_t root_out[HASH_SIZE]) {
     int level_nodes = num_leaves;
@@ -56,7 +58,7 @@ void merkle_auth_path(const uint8_t leaves[][HASH_SIZE], int num_leaves, int lea
     memcpy(root_out, level[0], HASH_SIZE);
 }
 
-/* Reconstruct root from leaf + auth path */
+// Reconstruct root from leaf + auth path
 void merkle_root_from_path(const uint8_t leaf[HASH_SIZE], int leaf_index,
                            const uint8_t auth_path[][HASH_SIZE], int height,
                            uint8_t root_out[HASH_SIZE]) {

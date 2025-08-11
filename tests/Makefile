@@ -3,6 +3,7 @@ CC = gcc
 CFLAGS = -Wall -Wextra -O2 -I../include
 LDFLAGS = -lssl -lcrypto
 
+# Reusisng source files from src/
 SRC_DIR = ../src
 SRC_OBJS = \
 	$(SRC_DIR)/csprng.o \
@@ -22,7 +23,6 @@ TEST_BIN = time_test
 
 # Default target
 all: $(TEST_BIN)
-
 
 # Build the test binary
 $(TEST_BIN): $(TEST_SRC) $(SRC_OBJS)

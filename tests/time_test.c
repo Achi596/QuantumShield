@@ -1,6 +1,9 @@
+// Import standard libraries
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+
+// Import project-specific headers
 #include "timer.h"
 #include "wots.h"
 #include "xmss_config.h"
@@ -27,6 +30,7 @@ int main() {
         fprintf(stderr, "Allocation failed\n");
         return 1;
     }
+
     // Generate a random WOTS secret key
     for (int i = 0; i < params.wots_len; i++) {
         csprng_random_bytes(key.sk[i], HASH_SIZE);
@@ -41,6 +45,7 @@ int main() {
     uint8_t msg_hard[HASH_SIZE];
     memset(msg_hard, 0xFF, HASH_SIZE);
 
+    // Initialize timer variables
     double start, end;
     double time_hardened_easy = 0, time_hardened_hard = 0;
     double time_vulnerable_easy = 0, time_vulnerable_hard = 0;
@@ -71,6 +76,7 @@ int main() {
         time_vulnerable_hard += (end - start);
     }
 
+    // --- Print Results ---
     printf("\n--- Results (Average Time per Signature) ---\n");
     printf("[Hardened Function (wots_sign)]\n");
     printf("  - 'Easy' Message (low digits):  %.12f s\n", time_hardened_easy / NUM_RUNS);
@@ -81,9 +87,11 @@ int main() {
     printf("  - 'Hard' Message (high digits): %.12f s\n", time_vulnerable_hard / NUM_RUNS);
     printf("\n");
 
+    // Calculate the differences
     double diff_hardened = (time_hardened_hard - time_hardened_easy) / NUM_RUNS;
     double diff_vulnerable = (time_vulnerable_hard - time_vulnerable_easy) / NUM_RUNS;
 
+    // Print the final analysis
     printf("--- Analysis ---\n");
     printf("Time difference in HARDENED version:   %.12f s\n", diff_hardened);
     printf("Time difference in VULNERABLE version: %.12f s\n", diff_vulnerable);

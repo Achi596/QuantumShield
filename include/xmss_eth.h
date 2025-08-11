@@ -6,14 +6,8 @@
 #include "xmss.h"
 #include "xmss_config.h"
 
-/**
- * @brief Compute the serialized signature size for the given XMSS/WOTS parameters.
- * This is defined as a static inline function for efficiency.
- * @param params A pointer to the structure holding the runtime parameters (h, w, etc.).
- * @return The calculated size in bytes.
- */
+// Compute the serialized signature size for the given XMSS/WOTS parameters
 static inline size_t xmss_eth_sig_size(const xmss_params *params) {
-    /* layout: index(4) || wots_sig(wots_len * HASH_SIZE) || auth_path(h * HASH_SIZE) */
     return 4 + ((size_t)params->wots_len + (size_t)params->h) * HASH_SIZE;
 }
 

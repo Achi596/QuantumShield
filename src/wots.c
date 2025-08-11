@@ -1,11 +1,14 @@
+// import standard libraries
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+
+// import project-specific headers
 #include "wots.h"
 #include "hash.h"
 #include "util.h"
 
-/* --- Memory Management --- */
+// Allocate memory for WOTS signature chains
 static uint8_t** alloc_chains(int wots_len) {
     uint8_t **chains = malloc(wots_len * sizeof(uint8_t*));
     if (!chains) return NULL;
@@ -21,6 +24,7 @@ static uint8_t** alloc_chains(int wots_len) {
     return chains;
 }
 
+// Free allocated for WOTS signature chains
 static void free_chains(uint8_t **chains, int wots_len) {
     if (!chains) return;
     for (int i = 0; i < wots_len; i++) {
@@ -29,6 +33,7 @@ static void free_chains(uint8_t **chains, int wots_len) {
     free(chains);
 }
 
+// Allocate memory for WOTS Key
 int wots_alloc_key(WOTSKey *key, const xmss_params *params) {
     key->sk = alloc_chains(params->wots_len);
     key->pk = alloc_chains(params->wots_len);
@@ -40,6 +45,7 @@ int wots_alloc_key(WOTSKey *key, const xmss_params *params) {
     return 0;
 }
 
+// Free allocated memory for WOTS Key
 void wots_free_key(WOTSKey *key, const xmss_params *params) {
     if (key) {
         free_chains(key->sk, params->wots_len);
@@ -47,11 +53,13 @@ void wots_free_key(WOTSKey *key, const xmss_params *params) {
     }
 }
 
+// Allocate memory for WOTS Signature
 int wots_alloc_sig(WOTSSignature *sig, const xmss_params *params) {
     sig->sig = alloc_chains(params->wots_len);
     return sig->sig ? 0 : -1;
 }
 
+// Free allocated memory for WOTS Signature
 void wots_free_sig(WOTSSignature *sig, const xmss_params *params) {
     if (sig) {
         free_chains(sig->sig, params->wots_len);
@@ -59,7 +67,7 @@ void wots_free_sig(WOTSSignature *sig, const xmss_params *params) {
 }
 
 
-/* --- Internal: Constant-Time hash chain --- */
+// Compute WOTS chain with constant-time hashing
 static void wots_chain_ct(uint8_t out[HASH_SIZE], const uint8_t in[HASH_SIZE], int start, int steps, int w) {
     uint8_t current_hash[HASH_SIZE];
     uint8_t next_hash[HASH_SIZE];
@@ -82,7 +90,7 @@ static void wots_chain_ct(uint8_t out[HASH_SIZE], const uint8_t in[HASH_SIZE], i
 }
 
 
-/* Convert msg hash -> base-w digits and compute checksum */
+// Convert msg hash -> base-w digits and compute checksum
 static void base_w_and_checksum(const uint8_t *input, const xmss_params *params, uint8_t *output) {
     int in = 0;
     int out = 0;
@@ -108,7 +116,7 @@ static void base_w_and_checksum(const uint8_t *input, const xmss_params *params,
     }
 }
 
-/* Compute pk from existing sk */
+// Compute pk from existing sk
 void wots_compute_pk(const xmss_params *params, WOTSKey *key) {
     for (int i = 0; i < params->wots_len; i++) {
         wots_chain_ct(key->pk[i], key->sk[i], 0, params->w - 1, params->w);
@@ -148,14 +156,6 @@ void wots_verify(const xmss_params *params, const uint8_t *msg, const WOTSSignat
     secure_zero_memory(msg_hash, HASH_SIZE);
     secure_zero_memory(base_w_digits, sizeof(base_w_digits));
 }
-
-/*
- ============================================================================
-    WARNING: The following functions are for demonstration purposes ONLY.
-    They are intentionally VULNERABLE to timing attacks.
-    DO NOT use them in production.
- ============================================================================
-*/
 
 // VULNERABLE hash chain function. The number of loops depends on 'steps'.
 static void wots_chain_vulnerable(uint8_t out[HASH_SIZE], const uint8_t in[HASH_SIZE], int start, int steps) {

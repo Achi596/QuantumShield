@@ -82,12 +82,27 @@ static int mode_sign(const char *message) {
     int key_loaded = xmss_load_key(&key, &params_from_file);
 
     // If a key is loaded, we need to verify the parameters match
-    if (key_loaded) {
-        printf("Key file found loading existing XMSS key (h=%d, w=%d)...\n", params_from_file.h, params_from_file.w);
+    if (key_loaded == 1) {
+        printf("Key file found!\n");
         if(params_from_file.h != g_params.h || params_from_file.w != g_params.w) {
             fprintf(stderr, "ERROR: Current parameters (h=%d, w=%d) do not match existing key file parameters.\n", g_params.h, g_params.w);
             fprintf(stderr, "Please verify your configuration and delete or move the old key file if you wish to continue with these new parameters.\n");
             return 1; // Throw an error if parameters do not match
+        }
+
+        // Check height matches
+        if (params_from_file.h <= 0 || params_from_file.h > 32) {
+            fprintf(stderr, "Invalid height h=%d. Must be > 0 and <= 32.\n", params_from_file.h);
+            fprintf(stderr, "Please verify your configuration and delete or move the old key file if you wish to continue with these new parameters.\n");
+            return -1;
+        }
+
+        // Check WOTS value matches
+        int verify_w = int_log2(params_from_file.w);
+        if (verify_w == -1) {
+            fprintf(stderr, "Invalid Winternitz parameter w=%d. Must be a power of 2.\n", params_from_file.w);
+            fprintf(stderr, "Please verify your configuration and delete or move the old key file if you wish to continue with these new parameters.\n");
+            return -1;
         }
 
     // If no key is loaded, we generate a new key and save it
@@ -100,7 +115,7 @@ static int mode_sign(const char *message) {
         }
         xmss_save_state(0);
     }
-    
+
     // Save the root hash
     if (xmss_alloc_sig(&sig, &g_params) != 0) { fprintf(stderr, "Failed to allocate signature\n"); return 1; }
     xmss_sign_auto(&g_params, (const uint8_t*)message, &key, &sig);
@@ -108,14 +123,12 @@ static int mode_sign(const char *message) {
     // Save the signature to a file    
     if (!save_root(key.root)) {
         fprintf(stderr, "Failed to save root hex\n");
-        xmss_free_sig(&sig, &g_params);
         return 1;
     }
 
     // Save the signature in Ethereum compact format
     if (xmss_eth_save_sig(SIG_FILE, &sig, &g_params) != 0) {
         fprintf(stderr, "Failed to save Ethereum compact signature\n");
-        xmss_free_sig(&sig, &g_params);
         return 1;
     }
 
@@ -165,7 +178,7 @@ static int mode_verify(const char *message) {
     int ok = xmss_verify(&params_from_file, (const uint8_t*)message, &sig, root);
     printf(ok ? "Verification SUCCESS\n" : "Verification FAILED\n");
     
-    xmss_free_sig(&sig, &params_from_file);
+    xmss_free_sig(&sig, &g_params);
     return ok ? 0 : 1;
 }
 
@@ -256,6 +269,13 @@ int main(int argc, char *argv[]) {
             print_usage(argv[0]);
             return 1;
         }
+    }
+
+    // Initalise XMSS parameters
+    g_params.h = h;
+    g_params.w = w;
+    if (xmss_params_init(&g_params, h, w) != 0) {
+        return -1;
     }
     
     // Ensure a mode is selected

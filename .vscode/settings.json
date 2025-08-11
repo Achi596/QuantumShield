@@ -3,7 +3,16 @@
         "HASH.C": "cpp",
         "rand.h": "c",
         "stdint.h": "c",
-        "xmss_config.h": "c"
+        "xmss_config.h": "c",
+        "stdlib.h": "c",
+        "xmss.h": "c",
+        "benchmark.h": "c",
+        "time.h": "c",
+        "math.h": "c",
+        "string.h": "c",
+        "stdio.h": "c",
+        "util.h": "c",
+        "hash.h": "c"
     },
     "C_Cpp.default.compilerPath": "C:/msys64/ucrt64/bin/gcc.exe",
 

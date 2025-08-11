@@ -1,23 +1,14 @@
+// Import standard libraries
 #include <string.h>
+#include <stdlib.h>
+
+// import project-specific headers
 #include "xmss.h"
 #include "hash.h"
 #include "xmss_config.h"
 #include "util.h"
-#include <stdlib.h>
 
-/**
- * @brief Generates a WOTS+ key pair for a specific leaf index.
- * 
- * This function uses the master seed from the XMSSKey and the leaf index
- * to deterministically generate the WOTS+ secret key via a Pseudorandom
- * Function (PRF), which is implemented here using SHAKE256.
- * The corresponding public key is then computed from the secret key.
- *
- * @param params    A pointer to the XMSS/WOTS runtime parameters.
- * @param key       A pointer to the master XMSSKey containing the seed.
- * @param index     The leaf index for which to generate the WOTS+ key.
- * @param wots_key  A pointer to the WOTSKey structure to be filled.
- */
+// Generate a WOTS+ key for a specific leaf index
 void xmss_generate_wots_key(const xmss_params *params, XMSSKey *key, int index, WOTSKey *wots_key) {
     // Buffer to hold the PRF input: master_seed || leaf_index
     uint8_t buffer[XMSS_SEED_BYTES + sizeof(int)];

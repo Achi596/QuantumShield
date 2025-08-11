@@ -4,9 +4,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define HASH_SIZE 32  // Output size for SHAKE256 (256-bit security)
+#define HASH_SIZE 32  // Optimal output size for SHAKE256 2^32 =256 bits
 
-// SHAKE256 hashing
+// SHAKE256 hash function
 void hash_shake256(const uint8_t *in, size_t inlen, uint8_t *out, size_t outlen);
 
 #endif

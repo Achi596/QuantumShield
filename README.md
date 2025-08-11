@@ -118,9 +118,9 @@ Optional Parameters (used with sign or benchmark):
 
 Major features wre added to enhance the functionality and performence of the original codebase including, SNARK generation, runtime parameterization and Side-Channel Hardening. Here’s a brief overview of their implementation.
 
-### SNARK Signiture Generation
+### SNARK Signature Generation
 
-This feature exports the XMSS signiture for validation in a single convenient JSON file, alloing for easy intergration of the XMSS Signiture with Zero Knowledge Proof Circuits as the file contains both the message, the hash and data required to derive a self contained proof.
+This feature exports the XMSS Signature for validation in a single convenient JSON file, alloing for easy integration of the XMSS Signature with Zero Knowledge Proof Circuits as the file contains both the message, the hash and data required to derive a self contained proof.
 
 The structure of the SNARK is comprised as per below:
 

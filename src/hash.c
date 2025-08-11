@@ -1,6 +1,9 @@
+// import standard libraries
+#include <stdio.h>
+
+// import project-specific headers
 #include "hash.h"
 #include <openssl/evp.h>
-#include <stdio.h>
 
 // Hash function using SHAKE256
 // This function takes an input buffer and produces a variable-length output

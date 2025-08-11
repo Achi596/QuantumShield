@@ -1,9 +1,11 @@
+// import standard libraries
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 #include <time.h>
 #include <stdlib.h>
 
+// import project-specific headers
 #include "benchmark.h"
 #include "timer.h"
 #include "xmss.h"
@@ -25,17 +27,18 @@ static void human_size(double bytes, char *out, size_t outlen) {
 void run_benchmark(const xmss_params *params, int keygen_runs, int sign_runs, int verify_runs) {
     printf("Benchmarking (h=%d, w=%d), this will take some time...\n", params->h, params->w);
 
+    // Initialize key and signature structures
     XMSSKey key;
-    const char *msg = "benchmark message";
-
-    double start, end;
-    double keygen_total = 0.0, sign_total = 0.0, verify_total = 0.0;
-
     size_t key_size  = sizeof(XMSSKey);
     size_t sig_size  = xmss_eth_sig_size(params);
     size_t root_size = HASH_SIZE;
 
-    /* KEYGEN benchmark */
+    // Initialize testing parameters
+    const char *msg = "benchmark message";
+    double start, end;
+    double keygen_total = 0.0, sign_total = 0.0, verify_total = 0.0;
+
+    // KEYGEN benchmark
     for (int i = 0; i < keygen_runs; i++) {
         start = hires_time_seconds();
         xmss_keygen(params, &key);
@@ -44,7 +47,7 @@ void run_benchmark(const xmss_params *params, int keygen_runs, int sign_runs, in
     }
     double keygen_avg = keygen_total / keygen_runs;
 
-    /* SIGN benchmark (reusing indices cyclically) */
+    // SIGN benchmark
     XMSSSignature sig_sign;
     if (xmss_alloc_sig(&sig_sign, params) != 0) { fprintf(stderr, "Benchmark failed to alloc sig\n"); return; }
     for (int i = 0; i < sign_runs; i++) {
@@ -58,7 +61,7 @@ void run_benchmark(const xmss_params *params, int keygen_runs, int sign_runs, in
     xmss_free_sig(&sig_sign, params);
 
 
-    /* VERIFY benchmark */
+    // VERIFY benchmark
     double verify_avg = 0.0;
     if (verify_runs > 0) {
         XMSSSignature sig_verify;
@@ -75,12 +78,13 @@ void run_benchmark(const xmss_params *params, int keygen_runs, int sign_runs, in
         xmss_free_sig(&sig_verify, params);
     }
 
-
+    // Convert the hash sizes to human-readable format
     char key_hr[32], sig_hr[32], root_hr[32];
     human_size((double)key_size, key_hr, sizeof key_hr);
     human_size((double)sig_size, sig_hr, sizeof sig_hr);
     human_size((double)root_size, root_hr, sizeof root_hr);
 
+    // Print the benchmark results
     printf("\n===== Benchmark (h=%d, w=%d, Averaged) =====\n", params->h, params->w);
     printf("Keygen runs : %d\n", keygen_runs);
     printf("Sign runs   : %d\n", sign_runs);
@@ -96,23 +100,28 @@ void run_benchmark(const xmss_params *params, int keygen_runs, int sign_runs, in
     printf("Msg used    : \"%s\"\n", msg);
     printf("================================\n");
 
-    /* CSV logging */
+    // Create/open CSV file
     const char *csv_file = "bench.csv";
     FILE *chk = fopen(csv_file, "r");
     int need_header = (chk == NULL);
     if(chk) fclose(chk);
 
+    // Error if can't create/open CSV file
     FILE *csv = fopen(csv_file, "a");
     if (!csv) {
         fprintf(stderr, "Warning: could not open %s for append\n", csv_file);
         return;
     }
+
+    // Write header if needed
     if (need_header) {
         fprintf(csv,
             "timestamp,h,w,keygen_runs,sign_runs,verify_runs,"
             "keygen_avg_s,sign_avg_s,verify_avg_s,"
             "key_size_bytes,sig_size_bytes,root_size_bytes\n");
     }
+
+    // Write the benchmark results
     time_t t = time(NULL);
     fprintf(csv,
         "%lld,%d,%d,%d,%d,%d,%.9f,%.9f,%.9f,%zu,%zu,%zu\n",
@@ -122,10 +131,8 @@ void run_benchmark(const xmss_params *params, int keygen_runs, int sign_runs, in
         keygen_avg, sign_avg, verify_avg,
         key_size, sig_size, root_size
     );
+
+    // Close the CSV file
     fclose(csv);
     printf("Appended results to %s\n", csv_file);
-}
-
-void benchmark_print_csv_hint(void) {
-    printf("CSV log: bench.csv (auto-appended)\n");
 }

@@ -1,10 +1,13 @@
+// import standard libraries
 #include <stdio.h>
 #include <math.h>
+
+// import project-specific headers
 #include "xmss_config.h"
 #include "hash.h"
 
 // Helper to calculate log2 for integer powers of 2
-static int int_log2(int n) {
+int int_log2(int n) {
     if (n <= 0) return -1;
     int log = 0;
     while ((1 << log) < n) {
@@ -14,6 +17,7 @@ static int int_log2(int n) {
     return log;
 }
 
+// Initialize XMSS parameters
 int xmss_params_init(xmss_params *params, int h, int w) {
     if (h <= 0 || h > 32) {
         fprintf(stderr, "Invalid height h=%d. Must be > 0 and <= 32.\n", h);

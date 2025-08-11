@@ -17,4 +17,4 @@ main.o: main.c
 
 # Housekeeping
 clean:
-	rm -f $(TARGET) $(OBJ) main.o bench.csv root.hex sig.bin xmss_key.bin xmss_state.dat *.json tests/time_test
+	rm -f $(TARGET) $(OBJ) main.o bench.csv root.hex sig.bin xmss_key.bin xmss_state.dat *.json tests/time_test hashsig

@@ -1,6 +1,9 @@
+// import standard libraries
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+
+// import project-specific headers
 #include "xmss_eth.h"
 #include "hash.h"
 
@@ -8,16 +11,13 @@
 static void u32le_store(uint8_t b[4], uint32_t x) {
     b[0] = (uint8_t)x; b[1] = (uint8_t)(x >> 8); b[2] = (uint8_t)(x >> 16); b[3] = (uint8_t)(x >> 24);
 }
+
+// Load a 32-bit unsigned integer from little-endian byte array
 static uint32_t u32le_load(const uint8_t b[4]) {
     return ((uint32_t)b[0]) | ((uint32_t)b[1] << 8) | ((uint32_t)b[2] << 16) | ((uint32_t)b[3] << 24);
 }
 
-/*
- * NOTE: The xmss_eth_sig_size function is now defined as 'static inline' in the header
- * "xmss_eth.h", so it is removed from this file to prevent redefinition errors.
- */
-
-/* Serialize */
+// Convert XMSS signature to Ethereum compact format
 int xmss_eth_serialize(const xmss_params *params, const XMSSSignature *sig,
                        uint8_t *out, size_t out_cap, size_t *out_len)
 {
@@ -42,7 +42,7 @@ int xmss_eth_serialize(const xmss_params *params, const XMSSSignature *sig,
     return 0;
 }
 
-/* Deserialize */
+// Deserialize XMSS signature from Ethereum compact format
 int xmss_eth_deserialize(xmss_params *params, XMSSSignature *sig,
                          const uint8_t *in, size_t in_len)
 {
@@ -69,7 +69,7 @@ int xmss_eth_deserialize(xmss_params *params, XMSSSignature *sig,
     return 0;
 }
 
-/* Save to file */
+// Save the Ethereum compact format to a file
 int xmss_eth_save_sig(const char *path, const XMSSSignature *sig, const xmss_params *params) {
     size_t need = xmss_eth_sig_size(params);
     uint8_t *buf = malloc(need);
@@ -83,6 +83,8 @@ int xmss_eth_save_sig(const char *path, const XMSSSignature *sig, const xmss_par
     
     FILE *f = fopen(path, "wb");
     if (!f) { free(buf); return -1; }
+
+    printf("Loaded key (h=%d, w=%d)\n", params->h, params->w);
     
     // Write params first, then the signature data
     int ok = 1;
@@ -95,7 +97,7 @@ int xmss_eth_save_sig(const char *path, const XMSSSignature *sig, const xmss_par
     return ok ? 0 : -1;
 }
 
-/* Load from file */
+// Load the Ethereum compact format from a file
 int xmss_eth_load_sig(const char *path, XMSSSignature *sig, xmss_params *params) {
     FILE *f = fopen(path, "rb");
     if (!f) return 0; /* not found */
@@ -103,6 +105,8 @@ int xmss_eth_load_sig(const char *path, XMSSSignature *sig, xmss_params *params)
     int h, w;
     if (fread(&h, sizeof(int), 1, f) != 1) { fclose(f); return -1; }
     if (fread(&w, sizeof(int), 1, f) != 1) { fclose(f); return -1; }
+
+    printf("Loaded key (h=%d, w=%d)\n", h, w);
 
     if (xmss_params_init(params, h, w) != 0) {
         fprintf(stderr, "Failed to init params from signature file\n");
